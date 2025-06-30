@@ -1,10 +1,11 @@
+mod constants;
 mod core;
 mod mempool;
 mod rpc;
 mod state;
 mod tx;
+mod vdf;
 mod vm;
-
 pub fn add(left: u64, right: u64) -> u64 {
     left + right
 }
