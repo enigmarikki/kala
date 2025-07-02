@@ -1,0 +1,57 @@
+// -----------------------------------------------------------
+//  transaction.fbs
+//  FlatBuffers schema for your {Send,Mint,Stake,Solve} enum
+// -----------------------------------------------------------
+namespace tx;
+
+// ----------- fixed-length byte blobs -----------------------
+// Using struct + fixed-length array means the bytes are
+// in-lined → zero-copy and no extra indirection.
+struct Bytes32  { data:[ubyte:32]; }
+struct Bytes64  { data:[ubyte:64]; }
+struct Bytes256 { data:[ubyte:256]; }
+
+// ----------- per-variant tables ----------------------------
+table SendTx {
+  sender:   Bytes32;
+  receiver: Bytes32;
+  denom:    Bytes32;
+  amount:   ulong;   // Rust u64
+  nonce:    ulong;
+  signature:Bytes64;
+}
+
+table MintTx {
+  sender:   Bytes32;
+  amount:   ulong;
+  denom:    Bytes32;
+  nonce:    ulong;
+  signature:Bytes64;
+}
+
+table StakeTx {
+  sender:              Bytes32;
+  delegation_receiver:  Bytes32;
+  amount:              ulong;
+  nonce:               ulong;
+  signature:           Bytes64;
+}
+
+table SolveTx {
+  sender:    Bytes32;
+  proof:     Bytes256;
+  puzzle_id: Bytes32;
+  nonce:     ulong;
+  signature: Bytes64;
+}
+
+// ----------- enum/union wrapper ----------------------------
+// FlatBuffers encodes enums as a (type, value) pair.
+union TxBody { SendTx, MintTx, StakeTx, SolveTx}
+
+table Transaction {
+  body:      TxBody;      // the actual table
+}
+
+// Make this the root object that gets serialized.
+root_type Transaction;

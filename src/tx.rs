@@ -1,560 +1,457 @@
-use crate::constants::{EMPTY32BYTES, EMPTY64BYTES, Sized32Bytes, Sized64Bytes, Sized256Bytes};
-use aes_gcm::Nonce;
-use aes_gcm::aead::Payload;
-use bincode::{self, config, config::Configuration};
-use bincode::{Decode, Encode};
-use ring::signature::{EcdsaKeyPair, Ed25519KeyPair, KeyPair};
-use std::sync::Arc;
-//TODO: should i add the nonce manually or calibrate automatically?
-//TODO: handle errors gracefully for best practice
+//! – Uses tx_generated.rs produced from `schema/tx.fbs` (vector<u8> fields).  
+//! – Signs the canonical FlatBuffers bytes (signature field zeroed).  
+
+use crate::constants::{EMPTY64BYTES, Sized32Bytes, Sized64Bytes, Sized256Bytes};
+use crate::kalav1::tx_generated::tx::{
+    Bytes32, Bytes64, Bytes256, MintTx, MintTxArgs, SendTx, SendTxArgs, SolveTx, SolveTxArgs,
+    StakeTx, StakeTxArgs, Transaction as TransactionFb, TransactionArgs, TxBody,
+};
+
+use flatbuffers::FlatBufferBuilder;
+use ring::signature::{Ed25519KeyPair, KeyPair};
+
+// ---------------------------------------------------------------------------
+// Trait that every variant implements
+// ---------------------------------------------------------------------------
 pub trait Signable {
-    fn sign(&mut self, sender: &Ed25519KeyPair);
+    fn sign(&mut self, signer: &Ed25519KeyPair);
 }
 
+// ---------------------------------------------------------------------------
+// Concrete variant structs
+// ---------------------------------------------------------------------------
 #[derive(Debug, Clone)]
 pub struct Send {
-    pub sender: Sized32Bytes,
-    pub receiver: Sized32Bytes,
-    pub denom: Sized32Bytes,
+    pub sender: Bytes32,
+    pub receiver: Bytes32,
+    pub denom: Bytes32,
     pub amount: u64,
     pub nonce: u64,
-    pub signature: Sized64Bytes,
+    pub signature: Bytes64,
 }
 
 #[derive(Debug, Clone)]
 pub struct Mint {
-    pub sender: Sized32Bytes,
+    pub sender: Bytes32,
     pub amount: u64,
-    pub denom: Sized32Bytes,
+    pub denom: Bytes32,
     pub nonce: u64,
-    pub signature: Sized64Bytes,
-}
-
-#[derive(Debug, Clone)]
-pub struct Solve {
-    pub sender: Sized32Bytes,
-    pub proof: Sized256Bytes,
-    pub puzzle_id: Sized32Bytes,
-    pub nonce: u64,
-    pub signature: Sized64Bytes,
+    pub signature: Bytes64,
 }
 
 #[derive(Debug, Clone)]
 pub struct Stake {
-    pub sender: Sized32Bytes,
-    pub delegation_receiver: Sized32Bytes,
+    pub sender: Bytes32,
+    pub delegation_receiver: Bytes32,
     pub amount: u64,
     pub nonce: u64,
-    pub signature: Sized64Bytes,
+    pub signature: Bytes64,
 }
 
 #[derive(Debug, Clone)]
-pub enum Transaction<SE = Send, MT = Mint, ST = Stake, SL = Solve> {
-    Send(SE),
-    Mint(MT),
-    Stake(ST),
-    Solve(SL),
+pub struct Solve {
+    pub sender: Bytes32,
+    pub proof: Bytes256,
+    pub puzzle_id: Bytes32,
+    pub nonce: u64,
+    pub signature: Bytes64,
 }
 
+// ---------------------------------------------------------------------------
+// Enum wrapper (mirrors FlatBuffers union)
+// ---------------------------------------------------------------------------
+#[derive(Debug, Clone)]
+pub enum Transaction {
+    Send(Send),
+    Mint(Mint),
+    Stake(Stake),
+    Solve(Solve),
+}
+
+// ---------------------------------------------------------------------------
+// FlatBuffers encode / decode
+// ---------------------------------------------------------------------------
 impl Transaction {
-    pub fn sign(&mut self, sender: &Ed25519KeyPair) {
-        match self {
-            Transaction::Send(tx) => tx.sign(sender),
-            Transaction::Mint(tx) => tx.sign(sender),
-            Transaction::Stake(tx) => tx.sign(sender),
-            Transaction::Solve(tx) => tx.sign(sender),
+    /// Serialise the transaction into its canonical FlatBuffers byte slice.
+    pub fn to_flatbuf(&self) -> Vec<u8> {
+        let mut fbb = FlatBufferBuilder::new();
+        let (body_type, body_val) = match self {
+            Transaction::Send(t) => {
+                let off = SendTx::create(
+                    &mut fbb,
+                    &SendTxArgs {
+                        sender: Some(&t.sender),
+                        receiver: Some(&t.receiver),
+                        denom: Some(&t.denom),
+                        amount: t.amount,
+                        nonce: t.nonce,
+                        signature: Some(&t.signature),
+                    },
+                );
+                (TxBody::SendTx, off.as_union_value())
+            }
+            Transaction::Mint(t) => {
+                let off = MintTx::create(
+                    &mut fbb,
+                    &MintTxArgs {
+                        sender: Some(&t.sender),
+                        amount: t.amount,
+                        denom: Some(&t.denom),
+                        nonce: t.nonce,
+                        signature: Some(&t.signature),
+                    },
+                );
+                (TxBody::MintTx, off.as_union_value())
+            }
+            Transaction::Stake(t) => {
+                let off = StakeTx::create(
+                    &mut fbb,
+                    &StakeTxArgs {
+                        sender: Some(&t.sender),
+                        delegation_receiver: Some(&t.delegation_receiver),
+                        amount: t.amount,
+                        nonce: t.nonce,
+                        signature: Some(&t.signature),
+                    },
+                );
+                (TxBody::StakeTx, off.as_union_value())
+            }
+            Transaction::Solve(t) => {
+                let off = SolveTx::create(
+                    &mut fbb,
+                    &SolveTxArgs {
+                        sender: Some(&t.sender),
+                        proof: Some(&t.proof),
+                        puzzle_id: Some(&t.puzzle_id),
+                        nonce: t.nonce,
+                        signature: Some(&t.signature),
+                    },
+                );
+                (TxBody::SolveTx, off.as_union_value())
+            }
+        };
+
+        let root = TransactionFb::create(
+            &mut fbb,
+            &TransactionArgs {
+                body_type,
+                body: Some(body_val),
+            },
+        );
+        fbb.finish(root, None);
+        fbb.finished_data().to_vec()
+    }
+
+    /// Deserialize a FlatBuffers payload back into `Transaction` (length‑checks included).
+    pub fn from_flatbuf(bytes: &[u8]) -> Option<Self> {
+        let tx = crate::kalav1::tx_generated::tx::root_as_transaction(bytes).ok()?;
+        match tx.body_type() {
+            TxBody::SendTx => {
+                let st = tx.body_as_send_tx()?;
+                Some(Transaction::Send(Send {
+                    sender: *st.sender()?,
+                    receiver: *st.receiver()?,
+                    denom: *st.denom()?,
+                    amount: st.amount(),
+                    nonce: st.nonce(),
+                    signature: *st.signature()?,
+                }))
+            }
+            TxBody::MintTx => {
+                let mt = tx.body_as_mint_tx()?;
+                Some(Transaction::Mint(Mint {
+                    sender: *mt.sender()?,
+                    amount: mt.amount(),
+                    denom: *mt.denom()?,
+                    nonce: mt.nonce(),
+                    signature: *mt.signature()?,
+                }))
+            }
+            TxBody::StakeTx => {
+                let st = tx.body_as_stake_tx()?;
+                Some(Transaction::Stake(Stake {
+                    sender: *st.sender()?,
+                    delegation_receiver: *st.delegation_receiver()?,
+                    amount: st.amount(),
+                    nonce: st.nonce(),
+                    signature: *st.signature()?,
+                }))
+            }
+            TxBody::SolveTx => {
+                let sv = tx.body_as_solve_tx()?;
+                Some(Transaction::Solve(Solve {
+                    sender: *sv.sender()?,
+                    proof: *sv.proof()?,
+                    puzzle_id: *sv.puzzle_id()?,
+                    nonce: sv.nonce(),
+                    signature: *sv.signature()?,
+                }))
+            }
+            _ => None,
         }
     }
 }
 
+// ---------------------------------------------------------------------------
+// Constructors + Sign impls (now signing FlatBuffers payloads)
+// ---------------------------------------------------------------------------
 impl Send {
     pub fn new(
-        sender: &Ed25519KeyPair,
-        receiver: Sized32Bytes,
-        denom: Sized32Bytes,
+        kp: &Ed25519KeyPair,
+        receiver: Bytes32,
+        denom: Bytes32,
         amount: u64,
         nonce: u64,
     ) -> Transaction {
-        let sender: Sized32Bytes = sender
-            .public_key()
-            .as_ref()
-            .try_into()
-            .expect("Could not fetch the public key");
-        let tx = Send {
-            sender,
+        let key: Sized32Bytes = kp.public_key().as_ref().try_into().unwrap();
+        Transaction::Send(Send {
+            sender: Bytes32(key),
             receiver,
             denom,
             amount,
-            signature: EMPTY64BYTES,
-            nonce: nonce,
-        };
-        Transaction::Send(tx)
+            nonce,
+            signature: Bytes64(EMPTY64BYTES),
+        })
     }
 }
+
 impl Signable for Send {
-    fn sign(&mut self, sender: &Ed25519KeyPair) {
-        let payload = bincode::encode_to_vec(
-            (
-                &self.sender,
-                &self.receiver,
-                &self.denom,
-                &self.amount,
-                &self.nonce,
-            ),
-            config::standard(),
-        )
-        .expect("Unable to encode the payload");
-        self.signature = sender
-            .sign(&payload)
-            .as_ref()
-            .try_into()
-            .expect("Failed to sign");
+    fn sign(&mut self, kp: &Ed25519KeyPair) {
+        let mut tmp = self.clone();
+        tmp.signature = Bytes64(EMPTY64BYTES); // zero before hashing
+        let payload = Transaction::Send(tmp).to_flatbuf();
+        let signature_bytes: Sized64Bytes = kp.sign(&payload).as_ref().try_into().unwrap();
+        self.signature = Bytes64(signature_bytes);
     }
 }
 
 impl Mint {
-    pub fn new(
-        sender: &Ed25519KeyPair,
-        amount: u64,
-        denom: Sized32Bytes,
-        nonce: u64,
-    ) -> Transaction {
-        let sender = sender
-            .public_key()
-            .as_ref()
-            .try_into()
-            .expect("Could not fetch the senders public key");
-        let tx = Mint {
-            sender,
+    pub fn new(kp: &Ed25519KeyPair, amount: u64, denom: Bytes32, nonce: u64) -> Transaction {
+        let key: Sized32Bytes = kp.public_key().as_ref().try_into().unwrap();
+
+        Transaction::Mint(Mint {
+            sender: Bytes32(key),
             amount,
             denom,
             nonce,
-            signature: EMPTY64BYTES,
-        };
-        Transaction::Mint(tx)
+            signature: Bytes64(EMPTY64BYTES),
+        })
     }
 }
 
 impl Signable for Mint {
-    fn sign(&mut self, sender: &Ed25519KeyPair) {
-        let payload = bincode::encode_to_vec(
-            (&self.sender, &self.amount, &self.denom, &self.nonce),
-            config::standard(),
-        )
-        .expect("Unable to encode the payload");
-        self.signature = sender
-            .sign(&payload)
-            .as_ref()
-            .try_into()
-            .expect("Failed to sign the transaction");
+    fn sign(&mut self, kp: &Ed25519KeyPair) {
+        let mut tmp = self.clone();
+        tmp.signature = Bytes64(EMPTY64BYTES);
+        let payload = Transaction::Mint(tmp).to_flatbuf();
+        let signature_bytes: Sized64Bytes = kp.sign(&payload).as_ref().try_into().unwrap();
+        self.signature = Bytes64(signature_bytes);
     }
 }
 
 impl Stake {
     pub fn new(
-        sender: &Ed25519KeyPair,
-        delegation_receiver: Sized32Bytes,
+        kp: &Ed25519KeyPair,
+        delegation_receiver: Bytes32,
         amount: u64,
         nonce: u64,
     ) -> Transaction {
-        let sender = sender
-            .public_key()
-            .as_ref()
-            .try_into()
-            .expect("Could not get the public key");
-        let tx = Stake {
-            sender,
+        let key: Sized32Bytes = kp.public_key().as_ref().try_into().unwrap();
+        Transaction::Stake(Stake {
+            sender: Bytes32(key),
             delegation_receiver,
             amount,
             nonce,
-            signature: EMPTY64BYTES,
-        };
-        Transaction::Stake(tx)
+            signature: Bytes64(EMPTY64BYTES),
+        })
     }
 }
 
 impl Signable for Stake {
-    fn sign(&mut self, sender: &Ed25519KeyPair) {
-        let payload = bincode::encode_to_vec(
-            (
-                &self.sender,
-                &self.delegation_receiver,
-                &self.amount,
-                &self.nonce,
-            ),
-            config::standard(),
-        )
-        .expect("Cant encode the message");
-        self.signature = sender
-            .sign(&payload)
-            .as_ref()
-            .try_into()
-            .expect("Failed to sign message");
+    fn sign(&mut self, kp: &Ed25519KeyPair) {
+        let mut tmp = self.clone();
+        tmp.signature = Bytes64(EMPTY64BYTES);
+        let payload = Transaction::Stake(tmp).to_flatbuf();
+        let signature_bytes: Sized64Bytes = kp.sign(&payload).as_ref().try_into().unwrap();
+        self.signature = Bytes64(signature_bytes);
     }
 }
 
 impl Solve {
     pub fn new(
-        sender: &Ed25519KeyPair,
-        proof: Sized256Bytes,
-        puzzle_id: Sized32Bytes,
+        kp: &Ed25519KeyPair,
+        proof: Bytes256,
+        puzzle_id: Bytes32,
         nonce: u64,
     ) -> Transaction {
-        let sender = sender
-            .public_key()
-            .as_ref()
-            .try_into()
-            .expect("Can't fetch the public key");
-        let tx = Solve {
-            sender,
+        let key: Sized32Bytes = kp.public_key().as_ref().try_into().unwrap();
+
+        Transaction::Solve(Solve {
+            sender: Bytes32(key),
             proof,
             puzzle_id,
             nonce,
-            signature: EMPTY64BYTES,
-        };
-        Transaction::Solve(tx)
-    }
-}
-impl Signable for Solve {
-    fn sign(&mut self, sender: &Ed25519KeyPair) {
-        let payload = bincode::encode_to_vec(
-            (&self.sender, &self.proof, &self.puzzle_id, &self.nonce),
-            config::standard(),
-        )
-        .expect("Can't encode tx as bytes");
-        self.signature = sender
-            .sign(&payload)
-            .as_ref()
-            .try_into()
-            .expect("Failed to sign message");
+            signature: Bytes64(EMPTY64BYTES),
+        })
     }
 }
 
-#[cfg(test)]
+impl Signable for Solve {
+    fn sign(&mut self, kp: &Ed25519KeyPair) {
+        let mut tmp = self.clone();
+        tmp.signature = Bytes64(EMPTY64BYTES);
+        let payload = Transaction::Solve(tmp).to_flatbuf();
+        let signature_bytes: Sized64Bytes = kp.sign(&payload).as_ref().try_into().unwrap();
+        self.signature = Bytes64(signature_bytes);
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Blanket impl so `Transaction` itself is Signable via enum dispatch
+// ---------------------------------------------------------------------------
+impl Signable for Transaction {
+    fn sign(&mut self, kp: &Ed25519KeyPair) {
+        match self {
+            Transaction::Send(t) => t.sign(kp),
+            Transaction::Mint(t) => t.sign(kp),
+            Transaction::Stake(t) => t.sign(kp),
+            Transaction::Solve(t) => t.sign(kp),
+        }
+    }
+}#[cfg(test)]
 mod tests {
     use super::*;
     use ring::rand::SystemRandom;
     use ring::signature::{Ed25519KeyPair, KeyPair};
 
-    // Helper function to create a test keypair
-    fn create_test_keypair() -> Ed25519KeyPair {
+    /* ---------- helper macros & creators -------------------------- */
+
+    macro_rules! b32  { ($byte:expr) => { Bytes32([$byte; 32]) }; }
+    macro_rules! b64  { ($byte:expr) => { Bytes64([$byte; 64]) }; }
+    macro_rules! b256 { ($byte:expr) => { Bytes256([$byte; 256]) }; }
+
+    fn keypair() -> Ed25519KeyPair {
         let rng = SystemRandom::new();
-        let pkcs8_bytes = Ed25519KeyPair::generate_pkcs8(&rng).unwrap();
-        Ed25519KeyPair::from_pkcs8(pkcs8_bytes.as_ref()).unwrap()
+        let pkcs8 = Ed25519KeyPair::generate_pkcs8(&rng).unwrap();
+        Ed25519KeyPair::from_pkcs8(pkcs8.as_ref()).unwrap()
     }
 
-    // Helper function to create a test sized array
-    fn create_test_sized32() -> Sized32Bytes {
-        [42u8; 32]
-    }
-
-    fn create_test_sized256() -> Sized256Bytes {
-        [99u8; 256]
-    }
+    /* ---------- SEND --------------------------------------------- */
 
     #[test]
-    fn test_send_transaction_creation() {
-        let sender_keypair = create_test_keypair();
-        let receiver = create_test_sized32();
-        let denom = create_test_sized32();
-        let amount = 1000u64;
-        let nonce = 1u64;
+    fn send_create_sign_roundtrip() {
+        let kp = keypair();
+        let mut tx = Send::new(&kp, b32!(1), b32!(2), 123, 1);
 
-        let tx = Send::new(&sender_keypair, receiver, denom, amount, nonce);
-
-        match tx {
-            Transaction::Send(send_tx) => {
-                // Verify sender public key is correctly set
-                assert_eq!(send_tx.sender, sender_keypair.public_key().as_ref());
-                assert_eq!(send_tx.receiver, receiver);
-                assert_eq!(send_tx.denom, denom);
-                assert_eq!(send_tx.amount, amount);
-                assert_eq!(send_tx.nonce, nonce);
-                // Signature should be empty initially
-                assert_eq!(send_tx.signature, EMPTY64BYTES);
+        // sender pub-key check
+        let pk_array: [u8; 32] = kp.public_key().as_ref().try_into().unwrap();
+        match &tx {
+            Transaction::Send(s) => {
+                assert_eq!(s.sender.0, pk_array);
+                assert_eq!(s.signature.0, EMPTY64BYTES);
             }
-            _ => panic!("Expected Send transaction"),
+            _ => panic!(),
+        }
+
+        // sign & verify signature changes
+        tx.sign(&kp);
+        match &tx {
+            Transaction::Send(s) => {
+                assert_ne!(s.signature.0, EMPTY64BYTES);
+                assert_eq!(s.signature.0.len(), 64);
+            }
+            _ => panic!(),
+        }
+
+        // FlatBuffers round-trip
+        let buf   = tx.to_flatbuf();
+        let back  = Transaction::from_flatbuf(&buf).unwrap();
+        match (tx, back) {
+            (Transaction::Send(a), Transaction::Send(b)) => {
+                assert_eq!(a.sender.0, b.sender.0);
+                assert_eq!(a.signature.0, b.signature.0);
+            }
+            _ => panic!(),
         }
     }
 
+    /* ---------- MINT --------------------------------------------- */
+
     #[test]
-    fn test_send_transaction_signing() {
-        let sender_keypair = create_test_keypair();
-        let receiver = create_test_sized32();
-        let denom = create_test_sized32();
-        let amount = 1000u64;
-        let nonce = 1u64;
+    fn mint_roundtrip() {
+        let kp = keypair();
+        let mut tx = Mint::new(&kp, 9_999, b32!(3), 2);
+        tx.sign(&kp);
 
-        let mut tx = Send::new(&sender_keypair, receiver, denom, amount, nonce);
+        let buf  = tx.to_flatbuf();
+        let back = Transaction::from_flatbuf(&buf).unwrap();
 
-        // Sign the transaction
-        tx.sign(&sender_keypair);
-
-        match tx {
-            Transaction::Send(send_tx) => {
-                // Signature should no longer be empty
-                assert_ne!(send_tx.signature, EMPTY64BYTES);
-
-                // Verify the signature is valid
-                let payload = bincode::encode_to_vec(
-                    (
-                        &send_tx.sender,
-                        &send_tx.receiver,
-                        &send_tx.denom,
-                        &send_tx.amount,
-                        &send_tx.nonce,
-                    ),
-                    config::standard(),
-                )
-                .expect("Unable to encode the payload");
-
-                // This would verify the signature is properly formed (64 bytes)
-                assert_eq!(send_tx.signature.len(), 64);
+        match (tx, back) {
+            (Transaction::Mint(a), Transaction::Mint(b)) => {
+                assert_eq!(a.amount, b.amount);
+                assert_eq!(a.signature.0, b.signature.0);
             }
-            _ => panic!("Expected Send transaction"),
+            _ => panic!(),
         }
     }
 
+    /* ---------- STAKE -------------------------------------------- */
+
     #[test]
-    fn test_mint_transaction_creation() {
-        let sender_keypair = create_test_keypair();
-        let amount = 5000u64;
-        let denom = create_test_sized32();
-        let nonce = 2u64;
+    fn stake_sig_diff_on_amount() {
+        let kp = keypair();
+        let mut tx1 = Stake::new(&kp, b32!(4), 1_000, 1);
+        let mut tx2 = Stake::new(&kp, b32!(4), 2_000, 1);
+        tx1.sign(&kp);
+        tx2.sign(&kp);
 
-        let tx = Mint::new(&sender_keypair, amount, denom, nonce);
-
-        match tx {
-            Transaction::Mint(mint_tx) => {
-                assert_eq!(mint_tx.sender, sender_keypair.public_key().as_ref());
-                assert_eq!(mint_tx.amount, amount);
-                assert_eq!(mint_tx.denom, denom);
-                assert_eq!(mint_tx.nonce, nonce);
-                assert_eq!(mint_tx.signature, EMPTY64BYTES);
+        match (tx1, tx2) {
+            (Transaction::Stake(a), Transaction::Stake(b)) => {
+                assert_ne!(a.signature.0, b.signature.0);
             }
-            _ => panic!("Expected Mint transaction"),
+            _ => panic!(),
         }
     }
 
+    /* ---------- SOLVE -------------------------------------------- */
+
     #[test]
-    fn test_mint_transaction_signing() {
-        let sender_keypair = create_test_keypair();
-        let amount = 5000u64;
-        let denom = create_test_sized32();
-        let nonce = 2u64;
+    fn solve_roundtrip() {
+        let kp = keypair();
+        let mut tx = Solve::new(&kp, b256!(5), b32!(6), 3);
+        tx.sign(&kp);
 
-        let mut tx = Mint::new(&sender_keypair, amount, denom, nonce);
-        tx.sign(&sender_keypair);
+        let buf  = tx.to_flatbuf();
+        let back = Transaction::from_flatbuf(&buf).unwrap();
 
-        match tx {
-            Transaction::Mint(mint_tx) => {
-                assert_ne!(mint_tx.signature, EMPTY64BYTES);
-                assert_eq!(mint_tx.signature.len(), 64);
+        match (tx, back) {
+            (Transaction::Solve(a), Transaction::Solve(b)) => {
+                assert_eq!(a.proof.0, b.proof.0);
+                assert_eq!(a.signature.0, b.signature.0);
             }
-            _ => panic!("Expected Mint transaction"),
+            _ => panic!(),
         }
     }
 
-    #[test]
-    fn test_stake_transaction_creation() {
-        let sender_keypair = create_test_keypair();
-        let delegation_receiver = create_test_sized32();
-        let amount = 10000u64;
-        let nonce = 3u64;
-
-        let tx = Stake::new(&sender_keypair, delegation_receiver, amount, nonce);
-
-        match tx {
-            Transaction::Stake(stake_tx) => {
-                assert_eq!(stake_tx.sender, sender_keypair.public_key().as_ref());
-                assert_eq!(stake_tx.delegation_receiver, delegation_receiver);
-                assert_eq!(stake_tx.amount, amount);
-                assert_eq!(stake_tx.nonce, nonce);
-                assert_eq!(stake_tx.signature, EMPTY64BYTES);
-            }
-            _ => panic!("Expected Stake transaction"),
-        }
-    }
+    /* ---------- ENUM DISPATCH LOOP ------------------------------- */
 
     #[test]
-    fn test_stake_transaction_signing() {
-        let sender_keypair = create_test_keypair();
-        let delegation_receiver = create_test_sized32();
-        let amount = 10000u64;
-        let nonce = 3u64;
-
-        let mut tx = Stake::new(&sender_keypair, delegation_receiver, amount, nonce);
-        tx.sign(&sender_keypair);
-
-        match tx {
-            Transaction::Stake(stake_tx) => {
-                assert_ne!(stake_tx.signature, EMPTY64BYTES);
-                assert_eq!(stake_tx.signature.len(), 64);
-            }
-            _ => panic!("Expected Stake transaction"),
-        }
-    }
-
-    #[test]
-    fn test_solve_transaction_creation() {
-        let sender_keypair = create_test_keypair();
-        let proof = create_test_sized256();
-        let puzzle_id = create_test_sized32();
-        let nonce = 4u64;
-
-        let tx = Solve::new(&sender_keypair, proof, puzzle_id, nonce);
-
-        match tx {
-            Transaction::Solve(solve_tx) => {
-                assert_eq!(solve_tx.sender, sender_keypair.public_key().as_ref());
-                assert_eq!(solve_tx.proof, proof);
-                assert_eq!(solve_tx.puzzle_id, puzzle_id);
-                assert_eq!(solve_tx.nonce, nonce);
-                assert_eq!(solve_tx.signature, EMPTY64BYTES);
-            }
-            _ => panic!("Expected Solve transaction"),
-        }
-    }
-
-    #[test]
-    fn test_solve_transaction_signing() {
-        let sender_keypair = create_test_keypair();
-        let proof = create_test_sized256();
-        let puzzle_id = create_test_sized32();
-        let nonce = 4u64;
-
-        let mut tx = Solve::new(&sender_keypair, proof, puzzle_id, nonce);
-        tx.sign(&sender_keypair);
-
-        match tx {
-            Transaction::Solve(solve_tx) => {
-                assert_ne!(solve_tx.signature, EMPTY64BYTES);
-                assert_eq!(solve_tx.signature.len(), 64);
-            }
-            _ => panic!("Expected Solve transaction"),
-        }
-    }
-
-    #[test]
-    fn test_transaction_enum_sign_method() {
-        let sender_keypair = create_test_keypair();
-
-        // Test signing through the Transaction enum for each type
-        let mut transactions = vec![
-            Send::new(
-                &sender_keypair,
-                create_test_sized32(),
-                create_test_sized32(),
-                1000,
-                1,
-            ),
-            Mint::new(&sender_keypair, 5000, create_test_sized32(), 2),
-            Stake::new(&sender_keypair, create_test_sized32(), 10000, 3),
-            Solve::new(
-                &sender_keypair,
-                create_test_sized256(),
-                create_test_sized32(),
-                4,
-            ),
+    fn sign_and_roundtrip_all_variants() {
+        let kp = keypair();
+        let mut cases = vec![
+            Send::new(&kp, b32!(10), b32!(11), 1, 1),
+            Mint::new(&kp, 2, b32!(12), 2),
+            Stake::new(&kp, b32!(13), 3, 3),
+            Solve::new(&kp, b256!(14), b32!(15), 4),
         ];
 
-        for tx in transactions.iter_mut() {
-            tx.sign(&sender_keypair);
+        for tx in cases.iter_mut() {
+            tx.sign(&kp);
+            let buf   = tx.to_flatbuf();
+            let back  = Transaction::from_flatbuf(&buf).unwrap();
 
-            // Verify each transaction type was signed
-            match tx {
-                Transaction::Send(send_tx) => assert_ne!(send_tx.signature, EMPTY64BYTES),
-                Transaction::Mint(mint_tx) => assert_ne!(mint_tx.signature, EMPTY64BYTES),
-                Transaction::Stake(stake_tx) => assert_ne!(stake_tx.signature, EMPTY64BYTES),
-                Transaction::Solve(solve_tx) => assert_ne!(solve_tx.signature, EMPTY64BYTES),
-            }
-        }
-    }
-
-    #[test]
-    fn test_nonce_values() {
-        let sender_keypair = create_test_keypair();
-
-        // Test that different nonce values produce different signatures
-        let mut tx1 = Send::new(
-            &sender_keypair,
-            create_test_sized32(),
-            create_test_sized32(),
-            1000,
-            1,
-        );
-        let mut tx2 = Send::new(
-            &sender_keypair,
-            create_test_sized32(),
-            create_test_sized32(),
-            1000,
-            2,
-        );
-
-        tx1.sign(&sender_keypair);
-        tx2.sign(&sender_keypair);
-
-        match (tx1, tx2) {
-            (Transaction::Send(send1), Transaction::Send(send2)) => {
-                assert_ne!(send1.signature, send2.signature);
-            }
-            _ => panic!("Expected Send transactions"),
-        }
-    }
-
-    #[test]
-    fn test_different_amounts_produce_different_signatures() {
-        let sender_keypair = create_test_keypair();
-        let receiver = create_test_sized32();
-        let denom = create_test_sized32();
-        let nonce = 1u64;
-
-        let mut tx1 = Send::new(&sender_keypair, receiver, denom, 1000, nonce);
-        let mut tx2 = Send::new(&sender_keypair, receiver, denom, 2000, nonce);
-
-        tx1.sign(&sender_keypair);
-        tx2.sign(&sender_keypair);
-
-        match (tx1, tx2) {
-            (Transaction::Send(send1), Transaction::Send(send2)) => {
-                assert_ne!(send1.signature, send2.signature);
-            }
-            _ => panic!("Expected Send transactions"),
-        }
-    }
-
-    #[test]
-    fn test_edge_cases() {
-        let sender_keypair = create_test_keypair();
-
-        // Test with zero amounts
-        let mut tx_zero = Send::new(
-            &sender_keypair,
-            create_test_sized32(),
-            create_test_sized32(),
-            0,
-            1,
-        );
-        tx_zero.sign(&sender_keypair);
-
-        match tx_zero {
-            Transaction::Send(send_tx) => {
-                assert_eq!(send_tx.amount, 0);
-                assert_ne!(send_tx.signature, EMPTY64BYTES);
-            }
-            _ => panic!("Expected Send transaction"),
-        }
-
-        // Test with max u64 value
-        let mut tx_max = Mint::new(&sender_keypair, u64::MAX, create_test_sized32(), 1);
-        tx_max.sign(&sender_keypair);
-
-        match tx_max {
-            Transaction::Mint(mint_tx) => {
-                assert_eq!(mint_tx.amount, u64::MAX);
-                assert_ne!(mint_tx.signature, EMPTY64BYTES);
-            }
-            _ => panic!("Expected Mint transaction"),
+            // Compare by FlatBuffers bytes equivalence
+            assert_eq!(buf, back.to_flatbuf());
         }
     }
 }

@@ -10,3 +10,4 @@ flatbuffers = "25.2.10"
 tokio = {version =  "1.45.1", features = ["full"]}
 rocksdb = {version = "0.23", default-features = false, features = ["lz4"]}
 bincode = "*"
+anyhow = "*"
