@@ -16,9 +16,10 @@ table SendTx {
   sender:   Bytes32;
   receiver: Bytes32;
   denom:    Bytes32;
-  amount:   ulong;   // Rust u64
+  amount:   ulong;
   nonce:    ulong;
   signature:Bytes64;
+  gas_sponsorer: Bytes32;
 }
 
 table MintTx {
@@ -27,6 +28,7 @@ table MintTx {
   denom:    Bytes32;
   nonce:    ulong;
   signature:Bytes64;
+  gas_sponsorer: Bytes32;
 }
 
 table StakeTx {
@@ -35,6 +37,7 @@ table StakeTx {
   amount:              ulong;
   nonce:               ulong;
   signature:           Bytes64;
+  gas_sponsorer: Bytes32;
 }
 
 table SolveTx {
@@ -43,6 +46,7 @@ table SolveTx {
   puzzle_id: Bytes32;
   nonce:     ulong;
   signature: Bytes64;
+  gas_sponsorer: Bytes32;
 }
 
 // ----------- enum/union wrapper ----------------------------

@@ -28,6 +28,7 @@ pub struct Send {
     pub amount: u64,
     pub nonce: u64,
     pub signature: Bytes64,
+    pub gas_sponsorer: Bytes32,
 }
 
 #[derive(Debug, Clone)]
@@ -37,6 +38,7 @@ pub struct Mint {
     pub denom: Bytes32,
     pub nonce: u64,
     pub signature: Bytes64,
+    pub gas_sponsorer: Bytes32,
 }
 
 #[derive(Debug, Clone)]
@@ -46,6 +48,7 @@ pub struct Stake {
     pub amount: u64,
     pub nonce: u64,
     pub signature: Bytes64,
+    pub gas_sponsorer: Bytes32,
 }
 
 #[derive(Debug, Clone)]
@@ -55,6 +58,7 @@ pub struct Solve {
     pub puzzle_id: Bytes32,
     pub nonce: u64,
     pub signature: Bytes64,
+    pub gas_sponsorer: Bytes32,
 }
 
 // ---------------------------------------------------------------------------
@@ -86,6 +90,7 @@ impl Transaction {
                         amount: t.amount,
                         nonce: t.nonce,
                         signature: Some(&t.signature),
+                        gas_sponsorer: Some(&t.gas_sponsorer),
                     },
                 );
                 (TxBody::SendTx, off.as_union_value())
@@ -99,6 +104,7 @@ impl Transaction {
                         denom: Some(&t.denom),
                         nonce: t.nonce,
                         signature: Some(&t.signature),
+                        gas_sponsorer: Some(&t.gas_sponsorer),
                     },
                 );
                 (TxBody::MintTx, off.as_union_value())
@@ -112,6 +118,7 @@ impl Transaction {
                         amount: t.amount,
                         nonce: t.nonce,
                         signature: Some(&t.signature),
+                        gas_sponsorer: Some(&t.gas_sponsorer),
                     },
                 );
                 (TxBody::StakeTx, off.as_union_value())
@@ -125,6 +132,7 @@ impl Transaction {
                         puzzle_id: Some(&t.puzzle_id),
                         nonce: t.nonce,
                         signature: Some(&t.signature),
+                        gas_sponsorer: Some(&t.gas_sponsorer),
                     },
                 );
                 (TxBody::SolveTx, off.as_union_value())
@@ -155,6 +163,7 @@ impl Transaction {
                     amount: st.amount(),
                     nonce: st.nonce(),
                     signature: *st.signature()?,
+                    gas_sponsorer: *st.gas_sponsorer()?,
                 }))
             }
             TxBody::MintTx => {
@@ -165,6 +174,7 @@ impl Transaction {
                     denom: *mt.denom()?,
                     nonce: mt.nonce(),
                     signature: *mt.signature()?,
+                    gas_sponsorer: *mt.gas_sponsorer()?,
                 }))
             }
             TxBody::StakeTx => {
@@ -175,6 +185,7 @@ impl Transaction {
                     amount: st.amount(),
                     nonce: st.nonce(),
                     signature: *st.signature()?,
+                    gas_sponsorer: *st.gas_sponsorer()?,
                 }))
             }
             TxBody::SolveTx => {
@@ -185,6 +196,7 @@ impl Transaction {
                     puzzle_id: *sv.puzzle_id()?,
                     nonce: sv.nonce(),
                     signature: *sv.signature()?,
+                    gas_sponsorer: *sv.gas_sponsorer()?,
                 }))
             }
             _ => None,
@@ -202,6 +214,7 @@ impl Send {
         denom: Bytes32,
         amount: u64,
         nonce: u64,
+        gas_sponsorer: Bytes32,
     ) -> Transaction {
         let key: Sized32Bytes = kp.public_key().as_ref().try_into().unwrap();
         Transaction::Send(Send {
@@ -211,6 +224,7 @@ impl Send {
             amount,
             nonce,
             signature: Bytes64(EMPTY64BYTES),
+            gas_sponsorer: gas_sponsorer,
         })
     }
 }
@@ -226,7 +240,13 @@ impl Signable for Send {
 }
 
 impl Mint {
-    pub fn new(kp: &Ed25519KeyPair, amount: u64, denom: Bytes32, nonce: u64) -> Transaction {
+    pub fn new(
+        kp: &Ed25519KeyPair,
+        amount: u64,
+        denom: Bytes32,
+        nonce: u64,
+        gas_sponsorer: Bytes32,
+    ) -> Transaction {
         let key: Sized32Bytes = kp.public_key().as_ref().try_into().unwrap();
 
         Transaction::Mint(Mint {
@@ -235,6 +255,7 @@ impl Mint {
             denom,
             nonce,
             signature: Bytes64(EMPTY64BYTES),
+            gas_sponsorer: gas_sponsorer,
         })
     }
 }
@@ -255,6 +276,7 @@ impl Stake {
         delegation_receiver: Bytes32,
         amount: u64,
         nonce: u64,
+        gas_sponsorer: Bytes32,
     ) -> Transaction {
         let key: Sized32Bytes = kp.public_key().as_ref().try_into().unwrap();
         Transaction::Stake(Stake {
@@ -263,6 +285,7 @@ impl Stake {
             amount,
             nonce,
             signature: Bytes64(EMPTY64BYTES),
+            gas_sponsorer: gas_sponsorer,
         })
     }
 }
@@ -283,6 +306,7 @@ impl Solve {
         proof: Bytes256,
         puzzle_id: Bytes32,
         nonce: u64,
+        gas_sponsorer: Bytes32,
     ) -> Transaction {
         let key: Sized32Bytes = kp.public_key().as_ref().try_into().unwrap();
 
@@ -292,6 +316,7 @@ impl Solve {
             puzzle_id,
             nonce,
             signature: Bytes64(EMPTY64BYTES),
+            gas_sponsorer: gas_sponsorer,
         })
     }
 }
@@ -318,7 +343,8 @@ impl Signable for Transaction {
             Transaction::Solve(t) => t.sign(kp),
         }
     }
-}#[cfg(test)]
+}
+#[cfg(test)]
 mod tests {
     use super::*;
     use ring::rand::SystemRandom;
@@ -326,9 +352,21 @@ mod tests {
 
     /* ---------- helper macros & creators -------------------------- */
 
-    macro_rules! b32  { ($byte:expr) => { Bytes32([$byte; 32]) }; }
-    macro_rules! b64  { ($byte:expr) => { Bytes64([$byte; 64]) }; }
-    macro_rules! b256 { ($byte:expr) => { Bytes256([$byte; 256]) }; }
+    macro_rules! b32 {
+        ($byte:expr) => {
+            Bytes32([$byte; 32])
+        };
+    }
+    macro_rules! b64 {
+        ($byte:expr) => {
+            Bytes64([$byte; 64])
+        };
+    }
+    macro_rules! b256 {
+        ($byte:expr) => {
+            Bytes256([$byte; 256])
+        };
+    }
 
     fn keypair() -> Ed25519KeyPair {
         let rng = SystemRandom::new();
@@ -341,7 +379,8 @@ mod tests {
     #[test]
     fn send_create_sign_roundtrip() {
         let kp = keypair();
-        let mut tx = Send::new(&kp, b32!(1), b32!(2), 123, 1);
+        let pub_key = Bytes32(kp.public_key().as_ref().try_into().unwrap());
+        let mut tx = Send::new(&kp, b32!(1), b32!(2), 123, 1, pub_key);
 
         // sender pub-key check
         let pk_array: [u8; 32] = kp.public_key().as_ref().try_into().unwrap();
@@ -364,8 +403,8 @@ mod tests {
         }
 
         // FlatBuffers round-trip
-        let buf   = tx.to_flatbuf();
-        let back  = Transaction::from_flatbuf(&buf).unwrap();
+        let buf = tx.to_flatbuf();
+        let back = Transaction::from_flatbuf(&buf).unwrap();
         match (tx, back) {
             (Transaction::Send(a), Transaction::Send(b)) => {
                 assert_eq!(a.sender.0, b.sender.0);
@@ -380,10 +419,11 @@ mod tests {
     #[test]
     fn mint_roundtrip() {
         let kp = keypair();
-        let mut tx = Mint::new(&kp, 9_999, b32!(3), 2);
+        let pub_key = Bytes32(kp.public_key().as_ref().try_into().unwrap());
+        let mut tx = Mint::new(&kp, 9_999, b32!(3), 2, pub_key);
         tx.sign(&kp);
 
-        let buf  = tx.to_flatbuf();
+        let buf = tx.to_flatbuf();
         let back = Transaction::from_flatbuf(&buf).unwrap();
 
         match (tx, back) {
@@ -400,8 +440,9 @@ mod tests {
     #[test]
     fn stake_sig_diff_on_amount() {
         let kp = keypair();
-        let mut tx1 = Stake::new(&kp, b32!(4), 1_000, 1);
-        let mut tx2 = Stake::new(&kp, b32!(4), 2_000, 1);
+        let pub_key = Bytes32(kp.public_key().as_ref().try_into().unwrap());
+        let mut tx1 = Stake::new(&kp, b32!(4), 1_000, 1, pub_key);
+        let mut tx2 = Stake::new(&kp, b32!(4), 2_000, 1, pub_key);
         tx1.sign(&kp);
         tx2.sign(&kp);
 
@@ -418,10 +459,11 @@ mod tests {
     #[test]
     fn solve_roundtrip() {
         let kp = keypair();
-        let mut tx = Solve::new(&kp, b256!(5), b32!(6), 3);
+        let pub_key = Bytes32(kp.public_key().as_ref().try_into().unwrap());
+        let mut tx = Solve::new(&kp, b256!(5), b32!(6), 3, pub_key);
         tx.sign(&kp);
 
-        let buf  = tx.to_flatbuf();
+        let buf = tx.to_flatbuf();
         let back = Transaction::from_flatbuf(&buf).unwrap();
 
         match (tx, back) {
@@ -438,17 +480,19 @@ mod tests {
     #[test]
     fn sign_and_roundtrip_all_variants() {
         let kp = keypair();
+
+        let pub_key = Bytes32(kp.public_key().as_ref().try_into().unwrap());
         let mut cases = vec![
-            Send::new(&kp, b32!(10), b32!(11), 1, 1),
-            Mint::new(&kp, 2, b32!(12), 2),
-            Stake::new(&kp, b32!(13), 3, 3),
-            Solve::new(&kp, b256!(14), b32!(15), 4),
+            Send::new(&kp, b32!(10), b32!(11), 1, 1, pub_key),
+            Mint::new(&kp, 2, b32!(12), 2, pub_key),
+            Stake::new(&kp, b32!(13), 3, 3, pub_key),
+            Solve::new(&kp, b256!(14), b32!(15), 4, pub_key),
         ];
 
         for tx in cases.iter_mut() {
             tx.sign(&kp);
-            let buf   = tx.to_flatbuf();
-            let back  = Transaction::from_flatbuf(&buf).unwrap();
+            let buf = tx.to_flatbuf();
+            let back = Transaction::from_flatbuf(&buf).unwrap();
 
             // Compare by FlatBuffers bytes equivalence
             assert_eq!(buf, back.to_flatbuf());

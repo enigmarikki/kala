@@ -396,6 +396,7 @@ pub mod tx {
         pub const VT_AMOUNT: flatbuffers::VOffsetT = 10;
         pub const VT_NONCE: flatbuffers::VOffsetT = 12;
         pub const VT_SIGNATURE: flatbuffers::VOffsetT = 14;
+        pub const VT_GAS_SPONSORER: flatbuffers::VOffsetT = 16;
 
         #[inline]
         pub unsafe fn init_from_table(table: flatbuffers::Table<'a>) -> Self {
@@ -414,6 +415,9 @@ pub mod tx {
             let mut builder = SendTxBuilder::new(_fbb);
             builder.add_nonce(args.nonce);
             builder.add_amount(args.amount);
+            if let Some(x) = args.gas_sponsorer {
+                builder.add_gas_sponsorer(x);
+            }
             if let Some(x) = args.signature {
                 builder.add_signature(x);
             }
@@ -471,6 +475,13 @@ pub mod tx {
             // which contains a valid value in this slot
             unsafe { self._tab.get::<Bytes64>(SendTx::VT_SIGNATURE, None) }
         }
+        #[inline]
+        pub fn gas_sponsorer(&self) -> Option<&'a Bytes32> {
+            // Safety:
+            // Created from valid Table for this object
+            // which contains a valid value in this slot
+            unsafe { self._tab.get::<Bytes32>(SendTx::VT_GAS_SPONSORER, None) }
+        }
     }
 
     impl flatbuffers::Verifiable for SendTx<'_> {
@@ -487,6 +498,7 @@ pub mod tx {
                 .visit_field::<u64>("amount", Self::VT_AMOUNT, false)?
                 .visit_field::<u64>("nonce", Self::VT_NONCE, false)?
                 .visit_field::<Bytes64>("signature", Self::VT_SIGNATURE, false)?
+                .visit_field::<Bytes32>("gas_sponsorer", Self::VT_GAS_SPONSORER, false)?
                 .finish();
             Ok(())
         }
@@ -498,6 +510,7 @@ pub mod tx {
         pub amount: u64,
         pub nonce: u64,
         pub signature: Option<&'a Bytes64>,
+        pub gas_sponsorer: Option<&'a Bytes32>,
     }
     impl<'a> Default for SendTxArgs<'a> {
         #[inline]
@@ -509,6 +522,7 @@ pub mod tx {
                 amount: 0,
                 nonce: 0,
                 signature: None,
+                gas_sponsorer: None,
             }
         }
     }
@@ -547,6 +561,11 @@ pub mod tx {
                 .push_slot_always::<&Bytes64>(SendTx::VT_SIGNATURE, signature);
         }
         #[inline]
+        pub fn add_gas_sponsorer(&mut self, gas_sponsorer: &Bytes32) {
+            self.fbb_
+                .push_slot_always::<&Bytes32>(SendTx::VT_GAS_SPONSORER, gas_sponsorer);
+        }
+        #[inline]
         pub fn new(
             _fbb: &'b mut flatbuffers::FlatBufferBuilder<'a, A>,
         ) -> SendTxBuilder<'a, 'b, A> {
@@ -572,6 +591,7 @@ pub mod tx {
             ds.field("amount", &self.amount());
             ds.field("nonce", &self.nonce());
             ds.field("signature", &self.signature());
+            ds.field("gas_sponsorer", &self.gas_sponsorer());
             ds.finish()
         }
     }
@@ -598,6 +618,7 @@ pub mod tx {
         pub const VT_DENOM: flatbuffers::VOffsetT = 8;
         pub const VT_NONCE: flatbuffers::VOffsetT = 10;
         pub const VT_SIGNATURE: flatbuffers::VOffsetT = 12;
+        pub const VT_GAS_SPONSORER: flatbuffers::VOffsetT = 14;
 
         #[inline]
         pub unsafe fn init_from_table(table: flatbuffers::Table<'a>) -> Self {
@@ -616,6 +637,9 @@ pub mod tx {
             let mut builder = MintTxBuilder::new(_fbb);
             builder.add_nonce(args.nonce);
             builder.add_amount(args.amount);
+            if let Some(x) = args.gas_sponsorer {
+                builder.add_gas_sponsorer(x);
+            }
             if let Some(x) = args.signature {
                 builder.add_signature(x);
             }
@@ -663,6 +687,13 @@ pub mod tx {
             // which contains a valid value in this slot
             unsafe { self._tab.get::<Bytes64>(MintTx::VT_SIGNATURE, None) }
         }
+        #[inline]
+        pub fn gas_sponsorer(&self) -> Option<&'a Bytes32> {
+            // Safety:
+            // Created from valid Table for this object
+            // which contains a valid value in this slot
+            unsafe { self._tab.get::<Bytes32>(MintTx::VT_GAS_SPONSORER, None) }
+        }
     }
 
     impl flatbuffers::Verifiable for MintTx<'_> {
@@ -678,6 +709,7 @@ pub mod tx {
                 .visit_field::<Bytes32>("denom", Self::VT_DENOM, false)?
                 .visit_field::<u64>("nonce", Self::VT_NONCE, false)?
                 .visit_field::<Bytes64>("signature", Self::VT_SIGNATURE, false)?
+                .visit_field::<Bytes32>("gas_sponsorer", Self::VT_GAS_SPONSORER, false)?
                 .finish();
             Ok(())
         }
@@ -688,6 +720,7 @@ pub mod tx {
         pub denom: Option<&'a Bytes32>,
         pub nonce: u64,
         pub signature: Option<&'a Bytes64>,
+        pub gas_sponsorer: Option<&'a Bytes32>,
     }
     impl<'a> Default for MintTxArgs<'a> {
         #[inline]
@@ -698,6 +731,7 @@ pub mod tx {
                 denom: None,
                 nonce: 0,
                 signature: None,
+                gas_sponsorer: None,
             }
         }
     }
@@ -731,6 +765,11 @@ pub mod tx {
                 .push_slot_always::<&Bytes64>(MintTx::VT_SIGNATURE, signature);
         }
         #[inline]
+        pub fn add_gas_sponsorer(&mut self, gas_sponsorer: &Bytes32) {
+            self.fbb_
+                .push_slot_always::<&Bytes32>(MintTx::VT_GAS_SPONSORER, gas_sponsorer);
+        }
+        #[inline]
         pub fn new(
             _fbb: &'b mut flatbuffers::FlatBufferBuilder<'a, A>,
         ) -> MintTxBuilder<'a, 'b, A> {
@@ -755,6 +794,7 @@ pub mod tx {
             ds.field("denom", &self.denom());
             ds.field("nonce", &self.nonce());
             ds.field("signature", &self.signature());
+            ds.field("gas_sponsorer", &self.gas_sponsorer());
             ds.finish()
         }
     }
@@ -781,6 +821,7 @@ pub mod tx {
         pub const VT_AMOUNT: flatbuffers::VOffsetT = 8;
         pub const VT_NONCE: flatbuffers::VOffsetT = 10;
         pub const VT_SIGNATURE: flatbuffers::VOffsetT = 12;
+        pub const VT_GAS_SPONSORER: flatbuffers::VOffsetT = 14;
 
         #[inline]
         pub unsafe fn init_from_table(table: flatbuffers::Table<'a>) -> Self {
@@ -799,6 +840,9 @@ pub mod tx {
             let mut builder = StakeTxBuilder::new(_fbb);
             builder.add_nonce(args.nonce);
             builder.add_amount(args.amount);
+            if let Some(x) = args.gas_sponsorer {
+                builder.add_gas_sponsorer(x);
+            }
             if let Some(x) = args.signature {
                 builder.add_signature(x);
             }
@@ -849,6 +893,13 @@ pub mod tx {
             // which contains a valid value in this slot
             unsafe { self._tab.get::<Bytes64>(StakeTx::VT_SIGNATURE, None) }
         }
+        #[inline]
+        pub fn gas_sponsorer(&self) -> Option<&'a Bytes32> {
+            // Safety:
+            // Created from valid Table for this object
+            // which contains a valid value in this slot
+            unsafe { self._tab.get::<Bytes32>(StakeTx::VT_GAS_SPONSORER, None) }
+        }
     }
 
     impl flatbuffers::Verifiable for StakeTx<'_> {
@@ -864,6 +915,7 @@ pub mod tx {
                 .visit_field::<u64>("amount", Self::VT_AMOUNT, false)?
                 .visit_field::<u64>("nonce", Self::VT_NONCE, false)?
                 .visit_field::<Bytes64>("signature", Self::VT_SIGNATURE, false)?
+                .visit_field::<Bytes32>("gas_sponsorer", Self::VT_GAS_SPONSORER, false)?
                 .finish();
             Ok(())
         }
@@ -874,6 +926,7 @@ pub mod tx {
         pub amount: u64,
         pub nonce: u64,
         pub signature: Option<&'a Bytes64>,
+        pub gas_sponsorer: Option<&'a Bytes32>,
     }
     impl<'a> Default for StakeTxArgs<'a> {
         #[inline]
@@ -884,6 +937,7 @@ pub mod tx {
                 amount: 0,
                 nonce: 0,
                 signature: None,
+                gas_sponsorer: None,
             }
         }
     }
@@ -917,6 +971,11 @@ pub mod tx {
                 .push_slot_always::<&Bytes64>(StakeTx::VT_SIGNATURE, signature);
         }
         #[inline]
+        pub fn add_gas_sponsorer(&mut self, gas_sponsorer: &Bytes32) {
+            self.fbb_
+                .push_slot_always::<&Bytes32>(StakeTx::VT_GAS_SPONSORER, gas_sponsorer);
+        }
+        #[inline]
         pub fn new(
             _fbb: &'b mut flatbuffers::FlatBufferBuilder<'a, A>,
         ) -> StakeTxBuilder<'a, 'b, A> {
@@ -941,6 +1000,7 @@ pub mod tx {
             ds.field("amount", &self.amount());
             ds.field("nonce", &self.nonce());
             ds.field("signature", &self.signature());
+            ds.field("gas_sponsorer", &self.gas_sponsorer());
             ds.finish()
         }
     }
@@ -967,6 +1027,7 @@ pub mod tx {
         pub const VT_PUZZLE_ID: flatbuffers::VOffsetT = 8;
         pub const VT_NONCE: flatbuffers::VOffsetT = 10;
         pub const VT_SIGNATURE: flatbuffers::VOffsetT = 12;
+        pub const VT_GAS_SPONSORER: flatbuffers::VOffsetT = 14;
 
         #[inline]
         pub unsafe fn init_from_table(table: flatbuffers::Table<'a>) -> Self {
@@ -984,6 +1045,9 @@ pub mod tx {
         ) -> flatbuffers::WIPOffset<SolveTx<'bldr>> {
             let mut builder = SolveTxBuilder::new(_fbb);
             builder.add_nonce(args.nonce);
+            if let Some(x) = args.gas_sponsorer {
+                builder.add_gas_sponsorer(x);
+            }
             if let Some(x) = args.signature {
                 builder.add_signature(x);
             }
@@ -1034,6 +1098,13 @@ pub mod tx {
             // which contains a valid value in this slot
             unsafe { self._tab.get::<Bytes64>(SolveTx::VT_SIGNATURE, None) }
         }
+        #[inline]
+        pub fn gas_sponsorer(&self) -> Option<&'a Bytes32> {
+            // Safety:
+            // Created from valid Table for this object
+            // which contains a valid value in this slot
+            unsafe { self._tab.get::<Bytes32>(SolveTx::VT_GAS_SPONSORER, None) }
+        }
     }
 
     impl flatbuffers::Verifiable for SolveTx<'_> {
@@ -1049,6 +1120,7 @@ pub mod tx {
                 .visit_field::<Bytes32>("puzzle_id", Self::VT_PUZZLE_ID, false)?
                 .visit_field::<u64>("nonce", Self::VT_NONCE, false)?
                 .visit_field::<Bytes64>("signature", Self::VT_SIGNATURE, false)?
+                .visit_field::<Bytes32>("gas_sponsorer", Self::VT_GAS_SPONSORER, false)?
                 .finish();
             Ok(())
         }
@@ -1059,6 +1131,7 @@ pub mod tx {
         pub puzzle_id: Option<&'a Bytes32>,
         pub nonce: u64,
         pub signature: Option<&'a Bytes64>,
+        pub gas_sponsorer: Option<&'a Bytes32>,
     }
     impl<'a> Default for SolveTxArgs<'a> {
         #[inline]
@@ -1069,6 +1142,7 @@ pub mod tx {
                 puzzle_id: None,
                 nonce: 0,
                 signature: None,
+                gas_sponsorer: None,
             }
         }
     }
@@ -1103,6 +1177,11 @@ pub mod tx {
                 .push_slot_always::<&Bytes64>(SolveTx::VT_SIGNATURE, signature);
         }
         #[inline]
+        pub fn add_gas_sponsorer(&mut self, gas_sponsorer: &Bytes32) {
+            self.fbb_
+                .push_slot_always::<&Bytes32>(SolveTx::VT_GAS_SPONSORER, gas_sponsorer);
+        }
+        #[inline]
         pub fn new(
             _fbb: &'b mut flatbuffers::FlatBufferBuilder<'a, A>,
         ) -> SolveTxBuilder<'a, 'b, A> {
@@ -1127,6 +1206,7 @@ pub mod tx {
             ds.field("puzzle_id", &self.puzzle_id());
             ds.field("nonce", &self.nonce());
             ds.field("signature", &self.signature());
+            ds.field("gas_sponsorer", &self.gas_sponsorer());
             ds.finish()
         }
     }
