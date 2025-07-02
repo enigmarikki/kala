@@ -1,7 +1,7 @@
 //! – Uses tx_generated.rs produced from `schema/tx.fbs` (vector<u8> fields).  
 //! – Signs the canonical FlatBuffers bytes (signature field zeroed).  
 
-use crate::constants::{EMPTY64BYTES, Sized32Bytes, Sized64Bytes, Sized256Bytes};
+use crate::constants::{EMPTY64BYTES, Sized32Bytes, Sized64Bytes};
 use crate::kalav1::tx_generated::tx::{
     Bytes32, Bytes64, Bytes256, MintTx, MintTxArgs, SendTx, SendTxArgs, SolveTx, SolveTxArgs,
     StakeTx, StakeTxArgs, Transaction as TransactionFb, TransactionArgs, TxBody,
