@@ -3,7 +3,6 @@ mod core;
 mod kalav1;
 mod mempool;
 mod net;
-mod rpc;
 mod state;
 mod tx;
 mod vdf;

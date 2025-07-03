@@ -10,7 +10,8 @@ namespace tx;
 struct Bytes32  { data:[ubyte:32]; }
 struct Bytes64  { data:[ubyte:64]; }
 struct Bytes256 { data:[ubyte:256]; }
-
+struct Nonce96 { data:[ubyte:12]; }   //   12 B
+struct Tag128  { mac:[ubyte:16]; }    // + 16 B
 // ----------- per-variant tables ----------------------------
 table SendTx {
   sender:   Bytes32;
@@ -57,5 +58,10 @@ table Transaction {
   body:      TxBody;      // the actual table
 }
 
+table SealedTx {
+  nonce: Nonce96;                     
+  tag  : Tag128;                      
+  ciphertext:[ubyte] (required);
+}
 // Make this the root object that gets serialized.
 root_type Transaction;
