@@ -1,0 +1,43 @@
+[package]
+name = "vdf-streamer"
+version = "0.1.0"
+edition = "2021"
+authors = ["Hrishi <hrishi@gmail.com>"]
+description = "Rust bindings for CPU VDF computation with streaming proof support"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/yourusername/cpu-vdf-streamer"
+keywords = ["vdf", "crypto", "verifiable-delay-function", "imaginary-class-groups"]
+categories = ["cryptography", "algorithms"]
+
+[dependencies]
+libc = "0.2"
+thiserror = "2.0.12"
+hex = "0.4"
+
+[build-dependencies]
+bindgen = "0.71.1"
+cc = "1.0"
+pkg-config = "0.3"
+
+[dev-dependencies]
+criterion = "0.6"
+rand = "0.9"
+hex-literal = "1.0"
+
+[[bench]]
+name = "vdf_benchmarks"
+harness = false
+
+[features]
+default = []
+# Enable AVX2 optimizations
+avx2 = []
+# Enable AVX512 optimizations
+avx512 = []
+# Enable all CPU optimizations
+full-opt = ["avx2", "avx512"]
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1

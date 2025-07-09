@@ -6,5 +6,4 @@ mod net;
 mod rpc;
 mod state;
 mod tx;
-mod vdf;
 mod vm;
