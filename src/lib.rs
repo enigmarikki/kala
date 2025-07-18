@@ -5,5 +5,4 @@ mod mempool;
 mod net;
 mod state;
 mod tx;
-mod vdf;
 mod vm;

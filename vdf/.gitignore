@@ -1,0 +1,64 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.dylib
+*.dll
+*.a
+src/verifier_test
+
+# Generated assembly file
+/asm_compiled.s
+/avx2_asm_compiled.s
+
+# Makefiles
+CMakeFiles/
+Makefile
+CMakeCache.txt
+cmake_install.cmake
+_deps/
+dist
+
+# Binary files
+src/compile_asm
+/vdf
+/server
+src/vdf_bench
+/vdf_server
+src/vdf_client
+src/1weso_test
+src/2weso_test
+src/prover_test
+src/emu_hw_test
+src/hw_test
+src/emu_hw_vdf_client
+src/hw_vdf_client
+/verifier
+/verifier_test
+/build/*
+*.whl
+*.egg-info
+*.o
+*.s
+
+# external library
+/src/hw/libft4222
+
+# pyenv
+.python-version
+.eggs
+.venv
+venv
+activate
+
+# Tests cache
+.mypy_cache
+.pytest_cache
+
+src/cmake-build-debug/
+.idea
+
+# Rust
+/target
+.vscode

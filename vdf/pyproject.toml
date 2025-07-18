@@ -1,0 +1,49 @@
+[build-system]
+requires = ["setuptools>=42", "wheel", "setuptools_scm[toml]>=3.5.0", "pybind11>=2.10.0"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools_scm]
+fallback_version = "unknown-no-.git-directory"
+local_scheme = "no-local-version"
+
+[tool.cibuildwheel]
+test-requires = "pytest"
+test-command = "pytest -v {project}/tests"
+skip = "*-manylinux_i686 *-win32 *-musllinux_*"
+
+[tool.cibuildwheel.linux]
+environment = "BUILD_VDF_CLIENT=N"
+build-verbosity = 0
+before-all = """
+yum -y install epel-release \
+&& echo "epel-release installed" \
+&& yum -y install boost-devel lzip \
+&& echo "boost-devel and lzip installed" \
+&& curl -L https://ftp.gnu.org/gnu/gmp/gmp-6.2.1.tar.lz | tar x --lzip \
+&& cp src/lib/gmp-patch-6.2.1/longlong.h gmp-6.2.1/ \
+&& cp src/lib/gmp-patch-6.2.1/compat.c gmp-6.2.1/ \
+&& cp src/lib/gmp-patch-6.2.1/mpz/inp_raw.c gmp-6.2.1/mpz \
+&& cd gmp-6.2.1 && ./configure --enable-fat --enable-cxx \
+&& make && make install && cd .. && rm -rf gmp-6.2.1 \
+&& cmake --version \
+&& uname -a \
+"""
+before-build = "python -m pip install --upgrade pip"
+
+[tool.cibuildwheel.macos]
+build-verbosity = 0
+before-all = "brew install gmp boost cmake"
+before-build = "python -m pip install --upgrade pip"
+environment = {MACOSX_DEPLOYMENT_TARGET="13", SYSTEM_VERSION_COMPAT=0, BUILD_VDF_CLIENT="N"}
+
+[tool.cibuildwheel.windows]
+build-verbosity = 0
+before-all = "git clone https://github.com/Chia-Network/mpir_gc_x64.git"
+environment = {BUILD_VDF_CLIENT="N"}
+before-build = "pip install delvewheel"
+repair-wheel-command = """
+delvewheel repair -v -w {dest_dir} {wheel} \
+--no-mangle-all \
+--add-path mpir_gc_x64 \
+--add-dll mpir.dll;mpir_gc.dll;mpir_broadwell.dll;mpir_broadwell_avx.dll;mpir_bulldozer.dll;mpir_haswell.dll;mpir_piledriver.dll;mpir_sandybridge.dll;mpir_skylake_avx.dll \
+"""
