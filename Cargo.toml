@@ -11,4 +11,3 @@ tokio = {version =  "1.45.1", features = ["full"]}
 rocksdb = {version = "0.23", default-features = false, features = ["lz4"]}
 bincode = "*"
 anyhow = "*"
-vdf-streamer = {path = "../vdf" }

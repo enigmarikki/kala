@@ -1,0 +1,73 @@
+# Makefile for tick shared library
+
+CXX = g++
+CC = gcc
+AS = as
+
+# Detect compiler for PIE flag
+ifneq (,$(findstring clang, $(shell $(CXX) --version)))
+NOPIE_FLAG = -fno-PIE
+else
+NOPIE_FLAG = -no-pie
+endif
+
+CXXFLAGS = -std=c++1z -D VDF_MODE=1 -D FAST_MACHINE=1 -pthread -fPIC -O3 -g \
+           -fvisibility=hidden \
+           -mavx2 -mbmi -mbmi2 -mlzcnt \
+           -I. -I./refcode
+LDFLAGS = -shared -flto -g
+LDLIBS = -lgmpxx -lgmp -lboost_system -pthread
+
+# Output library
+LIBRARY = libtick.a
+
+# Assembly files
+ASM_FILES = asm_compiled.s avx2_asm_compiled.s
+ASM_OBJECTS = $(ASM_FILES:.s=.o)
+
+# All object files needed
+OBJECTS = tick.o lzcnt.o $(ASM_OBJECTS)
+
+all: $(ASM_FILES) $(LIBRARY)
+
+$(LIBRARY): $(OBJECTS)
+	ar rcs $@ $^
+
+# Compiler flags for tick.o specifically - might need different flags
+tick.o: tick.cpp
+	$(CXX) $(CXXFLAGS) \
+	       -fpermissive \
+	       -Wno-error \
+	       -c $< -o $@
+
+lzcnt.o: refcode/lzcnt.c
+	$(CC) -O3 -fPIC -c $< -o $@
+
+# Assembly generator - build without PIC (restore original)
+compile_asm: compile_asm.cpp
+	$(CXX) -std=c++1z -D VDF_MODE=1 -D FAST_MACHINE=1 -pthread $(NOPIE_FLAG) -O3 -g -c compile_asm.cpp -o compile_asm.o
+	$(CXX) -flto $(NOPIE_FLAG) -g -o compile_asm compile_asm.o $(LDLIBS)
+
+# Generate assembly files
+asm_compiled.s: compile_asm
+	./compile_asm
+
+avx2_asm_compiled.s: compile_asm
+	./compile_asm avx2
+
+avx512_asm_compiled.s: compile_asm
+	./compile_asm avx512
+
+# Assemble with PIC
+%.o: %.s
+	$(AS) --64 -o $@ $<
+
+clean:
+	rm -f $(LIBRARY) *.o *.s compile_asm
+
+install: $(LIBRARY)
+	mkdir -p /usr/local/lib
+	cp $(LIBRARY) /usr/local/lib/
+	ldconfig
+
+.PHONY: all clean install

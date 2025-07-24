@@ -1,0 +1,5 @@
+{
+    "cmake.sourceDirectory": "/home/rikki/Desktop/kala/tick/src",
+    "cmake.buildDirectory": "${workspaceFolder}/build",
+    "C_Cpp.default.configurationProvider": "ms-vscode.cmake-tools"
+}

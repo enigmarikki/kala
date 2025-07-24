@@ -1,0 +1,22 @@
+cargo:rerun-if-env-changed=GMP_MPFR_SYS_CACHE
+$ mkdir -p "/home/rikki/Desktop/kala/tick/rust_bindings/target/debug/build/gmp-mpfr-sys-d5b3641c77d9222b/out/lib"
+$ mkdir -p "/home/rikki/Desktop/kala/tick/rust_bindings/target/debug/build/gmp-mpfr-sys-d5b3641c77d9222b/out/include"
+$ cp "/home/rikki/.cache/gmp-mpfr-sys/1.6/x86_64-unknown-linux-gnu/1.6.5/libmpc.a" "/home/rikki/Desktop/kala/tick/rust_bindings/target/debug/build/gmp-mpfr-sys-d5b3641c77d9222b/out/lib/libmpc.a"
+$ cp "/home/rikki/.cache/gmp-mpfr-sys/1.6/x86_64-unknown-linux-gnu/1.6.5/mpc.h" "/home/rikki/Desktop/kala/tick/rust_bindings/target/debug/build/gmp-mpfr-sys-d5b3641c77d9222b/out/include/mpc.h"
+$ cp "/home/rikki/.cache/gmp-mpfr-sys/1.6/x86_64-unknown-linux-gnu/1.6.5/libmpfr.a" "/home/rikki/Desktop/kala/tick/rust_bindings/target/debug/build/gmp-mpfr-sys-d5b3641c77d9222b/out/lib/libmpfr.a"
+$ cp "/home/rikki/.cache/gmp-mpfr-sys/1.6/x86_64-unknown-linux-gnu/1.6.5/mpfr.h" "/home/rikki/Desktop/kala/tick/rust_bindings/target/debug/build/gmp-mpfr-sys-d5b3641c77d9222b/out/include/mpfr.h"
+$ cp "/home/rikki/.cache/gmp-mpfr-sys/1.6/x86_64-unknown-linux-gnu/1.6.5/libgmp.a" "/home/rikki/Desktop/kala/tick/rust_bindings/target/debug/build/gmp-mpfr-sys-d5b3641c77d9222b/out/lib/libgmp.a"
+cargo:limb_bits=64
+cargo:rustc-check-cfg=cfg(nails)
+cargo:rustc-check-cfg=cfg(long_long_limb)
+$ cp "/home/rikki/.cache/gmp-mpfr-sys/1.6/x86_64-unknown-linux-gnu/1.6.5/gmp.h" "/home/rikki/Desktop/kala/tick/rust_bindings/target/debug/build/gmp-mpfr-sys-d5b3641c77d9222b/out/include/gmp.h"
+cargo:limb_bits=64
+cargo:rustc-check-cfg=cfg(nails)
+cargo:rustc-check-cfg=cfg(long_long_limb)
+cargo:out_dir=/home/rikki/Desktop/kala/tick/rust_bindings/target/debug/build/gmp-mpfr-sys-d5b3641c77d9222b/out
+cargo:lib_dir=/home/rikki/Desktop/kala/tick/rust_bindings/target/debug/build/gmp-mpfr-sys-d5b3641c77d9222b/out/lib
+cargo:include_dir=/home/rikki/Desktop/kala/tick/rust_bindings/target/debug/build/gmp-mpfr-sys-d5b3641c77d9222b/out/include
+cargo:rustc-link-search=native=/home/rikki/Desktop/kala/tick/rust_bindings/target/debug/build/gmp-mpfr-sys-d5b3641c77d9222b/out/lib
+cargo:rustc-link-lib=static=mpc
+cargo:rustc-link-lib=static=mpfr
+cargo:rustc-link-lib=static=gmp

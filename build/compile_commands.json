@@ -1,0 +1,22 @@
+[
+{
+  "directory": "/home/rikki/Desktop/kala/build",
+  "command": "/usr/bin/c++   -g -fPIE -Og -std=gnu++17 -o CMakeFiles/verifier_test.dir/verifier_test.cpp.o -c /home/rikki/Desktop/kala/tick/src/verifier_test.cpp",
+  "file": "/home/rikki/Desktop/kala/tick/src/verifier_test.cpp"
+},
+{
+  "directory": "/home/rikki/Desktop/kala/build",
+  "command": "/usr/bin/cc   -g -fPIE -Og -o CMakeFiles/verifier_test.dir/refcode/lzcnt.c.o -c /home/rikki/Desktop/kala/tick/src/refcode/lzcnt.c",
+  "file": "/home/rikki/Desktop/kala/tick/src/refcode/lzcnt.c"
+},
+{
+  "directory": "/home/rikki/Desktop/kala/build",
+  "command": "/usr/bin/c++   -g -fPIE -Og -std=gnu++17 -o CMakeFiles/stress_test.dir/stress_test.cpp.o -c /home/rikki/Desktop/kala/tick/src/stress_test.cpp",
+  "file": "/home/rikki/Desktop/kala/tick/src/stress_test.cpp"
+},
+{
+  "directory": "/home/rikki/Desktop/kala/build",
+  "command": "/usr/bin/cc   -g -fPIE -Og -o CMakeFiles/stress_test.dir/refcode/lzcnt.c.o -c /home/rikki/Desktop/kala/tick/src/refcode/lzcnt.c",
+  "file": "/home/rikki/Desktop/kala/tick/src/refcode/lzcnt.c"
+}
+]

@@ -1,0 +1,4 @@
+/home/rikki/Desktop/kala/build/CMakeFiles/verifier_test.dir
+/home/rikki/Desktop/kala/build/CMakeFiles/stress_test.dir
+/home/rikki/Desktop/kala/build/CMakeFiles/edit_cache.dir
+/home/rikki/Desktop/kala/build/CMakeFiles/rebuild_cache.dir

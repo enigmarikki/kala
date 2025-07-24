@@ -1,0 +1,1 @@
+/usr/bin/c++ -g CMakeFiles/verifier_test.dir/verifier_test.cpp.o CMakeFiles/verifier_test.dir/refcode/lzcnt.c.o -o verifier_test  -pthread 
