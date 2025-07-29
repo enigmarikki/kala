@@ -198,69 +198,6 @@ mod tests {
     use super::*;
     use std::time::Instant;
 
-    // /#[test]
-    // /fn test_vdf_squaring() {
-    // /    println!("Initializing VDF...");
-    // /    init();
-    // /
-    // /    let discriminant = "-141140317794792668862943332656856519378482291428727287413318722089216448567155737094768903643716404517549715385664163360316296284155310058980984373770517398492951860161717960368874227473669336541818575166839209228684755811071416376384551902149780184532086881683576071479646499601330824259260645952517205526679";
-    // /
-    // /    println!("Creating generator form...");
-    // /    let mut form = VdfForm::generator(discriminant);
-    // /    let reducer = Reducer::new();
-    // /
-    // /    let (a, b, c) = form.get_values();
-    // /    println!("Initial form: a={}, b={}, c={}", a, b, c);
-    // /
-    // /    // Reduce the initial form (generator might not return a reduced form)
-    // /    println!("Reducing initial form...");
-    // /    reducer.reduce(&mut form);
-    // /
-    // /    let (a, b, c) = form.get_values();
-    // /    println!("After reduction: a={}, b={}, c={}", a, b, c);
-    // /
-    // /    // Run iterations - matching mm.cpp logic
-    // /    let target_iterations = 100;
-    // /    let mut i = 0;
-    // /    let mut n_slow = 0;
-    // /
-    // /    println!("Starting VDF iterations...");
-    // /    while i < target_iterations {
-    // /        let mut sq_state = SquareState::new(0);
-    // /
-    // /        // Force only 32 iterations at a time (matching mm.cpp)
-    // /        let done = match repeated_square_fast(&mut sq_state, &mut form, discriminant, 32) {
-    // /            Ok(done) => done,
-    // /            Err(e) => {
-    // /                println!("Fail: {}", e);
-    // /                break;
-    // /            }
-    // /        };
-    // /
-    // /        if done == 0 {
-    // /            // Fall back to slow method for single iteration
-    // /            nudupl_form_inplace(&mut form, discriminant);
-    // /            reducer.reduce(&mut form);
-    // /            i += 1;
-    // /            n_slow += 1;
-    // /        } else {
-    // /            i += done;
-    // /        }
-    // /
-    // /        // Safety check to prevent infinite loop
-    // /        if i > 1000 {
-    // /            println!("Stopping at {} iterations", i);
-    // /            break;
-    // /        }
-    // /    }
-    // /
-    // /    let (a, b, c) = form.get_values();
-    // /    println!("\nAfter {} iterations (n_slow={}):", i, n_slow);
-    // /    println!("a = {}", a);
-    // /    println!("b = {}", b);
-    // /    println!("c = {}", c);
-    // /}
-
     #[test]
     pub fn test_fast_ready_form() {
         println!("Initializing VDF...");
