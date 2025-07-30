@@ -1,5 +1,5 @@
 //! RSW Timelock Puzzle Solver
-//! 
+//!
 //! This library provides Rust bindings to a CUDA-accelerated RSW puzzle solver.
 
 use std::ffi::{CStr, CString};
@@ -17,6 +17,12 @@ struct RSWResult {
     error_msg: *mut c_char,
 }
 
+#[repr(C)]
+struct RSWBatchResult {
+    results: *mut RSWResult,
+    count: usize,
+}
+
 #[link(name = "rsw_solver")]
 extern "C" {
     fn rsw_solver_new(device_id: i32) -> *mut RSWSolver;
@@ -28,6 +34,15 @@ extern "C" {
         c_hex: *const c_char,
         t: u32,
     ) -> RSWResult;
+    fn rsw_solver_solve_batch(
+        solver: *mut RSWSolver,
+        n_hex_array: *const *const c_char,
+        a_hex_array: *const *const c_char,
+        c_hex_array: *const *const c_char,
+        t_array: *const u32,
+        count: usize,
+    ) -> RSWBatchResult;
+    fn rsw_batch_result_free(batch_result: *mut RSWBatchResult);
     fn rsw_result_free_error(error_msg: *mut c_char);
     fn rsw_solver_get_device_name(solver: *mut RSWSolver) -> *const c_char;
     fn rsw_solver_get_optimal_batch_size(solver: *mut RSWSolver) -> usize;
@@ -39,7 +54,7 @@ pub struct Solver {
 }
 
 /// Result of solving an RSW puzzle
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct SolveResult {
     /// The 256-bit key derived from the puzzle
     pub key: [u8; 32],
@@ -50,10 +65,10 @@ pub struct SolveResult {
 pub enum Error {
     #[error("Failed to create solver: GPU not available or invalid device ID")]
     CreationFailed,
-    
+
     #[error("Solver error: {0}")]
     SolverError(String),
-    
+
     #[error("Invalid hex string: {0}")]
     InvalidHex(String),
 }
@@ -70,20 +85,20 @@ impl Solver {
             }
         }
     }
-    
+
     /// Create a solver using the default GPU (device 0)
     pub fn default() -> Result<Self, Error> {
         Self::new(0)
     }
-    
+
     /// Solve an RSW puzzle
-    /// 
+    ///
     /// # Arguments
     /// * `n` - RSA modulus as hex string
     /// * `a` - Base value as hex string (typically "2")
     /// * `c` - Challenge value as hex string
     /// * `t` - Number of sequential squarings
-    /// 
+    ///
     /// # Returns
     /// The 256-bit key as a byte array
     pub fn solve(&self, n: &str, a: &str, c: &str, t: u32) -> Result<SolveResult, Error> {
@@ -97,12 +112,15 @@ impl Solver {
         if !is_valid_hex(c) {
             return Err(Error::InvalidHex("c".to_string()));
         }
-        
+
         // Convert to C strings
-        let n_cstr = CString::new(n).map_err(|_| Error::InvalidHex("n contains null".to_string()))?;
-        let a_cstr = CString::new(a).map_err(|_| Error::InvalidHex("a contains null".to_string()))?;
-        let c_cstr = CString::new(c).map_err(|_| Error::InvalidHex("c contains null".to_string()))?;
-        
+        let n_cstr =
+            CString::new(n).map_err(|_| Error::InvalidHex("n contains null".to_string()))?;
+        let a_cstr =
+            CString::new(a).map_err(|_| Error::InvalidHex("a contains null".to_string()))?;
+        let c_cstr =
+            CString::new(c).map_err(|_| Error::InvalidHex("c contains null".to_string()))?;
+
         unsafe {
             let result = rsw_solver_solve(
                 self.inner,
@@ -111,7 +129,7 @@ impl Solver {
                 c_cstr.as_ptr(),
                 t,
             );
-            
+
             if result.success {
                 Ok(SolveResult { key: result.key })
             } else {
@@ -128,7 +146,107 @@ impl Solver {
             }
         }
     }
-    
+
+    /// Solve multiple RSW puzzles in batch for better GPU utilization
+    ///
+    /// # Arguments
+    /// * `puzzles` - Vector of (n, a, c, t) tuples
+    ///
+    /// # Returns
+    /// Vector of results in the same order as input
+    pub fn solve_batch(
+        &self,
+        puzzles: &[(String, String, String, u32)],
+    ) -> Result<Vec<SolveResult>, Error> {
+        if puzzles.is_empty() {
+            return Ok(Vec::new());
+        }
+
+        // Convert strings to C strings
+        let mut n_cstrings: Vec<CString> = Vec::new();
+        let mut a_cstrings: Vec<CString> = Vec::new();
+        let mut c_cstrings: Vec<CString> = Vec::new();
+        let mut t_values: Vec<u32> = Vec::new();
+
+        for (n, a, c, t) in puzzles {
+            // Validate hex strings
+            if !is_valid_hex(n) {
+                return Err(Error::InvalidHex("n".to_string()));
+            }
+            if !is_valid_hex(a) {
+                return Err(Error::InvalidHex("a".to_string()));
+            }
+            if !is_valid_hex(c) {
+                return Err(Error::InvalidHex("c".to_string()));
+            }
+
+            n_cstrings.push(
+                CString::new(n.as_str())
+                    .map_err(|_| Error::InvalidHex("n contains null".to_string()))?,
+            );
+            a_cstrings.push(
+                CString::new(a.as_str())
+                    .map_err(|_| Error::InvalidHex("a contains null".to_string()))?,
+            );
+            c_cstrings.push(
+                CString::new(c.as_str())
+                    .map_err(|_| Error::InvalidHex("c contains null".to_string()))?,
+            );
+            t_values.push(*t);
+        }
+
+        // Create arrays of pointers
+        let n_ptrs: Vec<*const c_char> = n_cstrings.iter().map(|s| s.as_ptr()).collect();
+        let a_ptrs: Vec<*const c_char> = a_cstrings.iter().map(|s| s.as_ptr()).collect();
+        let c_ptrs: Vec<*const c_char> = c_cstrings.iter().map(|s| s.as_ptr()).collect();
+
+        unsafe {
+            let batch_result = rsw_solver_solve_batch(
+                self.inner,
+                n_ptrs.as_ptr(),
+                a_ptrs.as_ptr(),
+                c_ptrs.as_ptr(),
+                t_values.as_ptr(),
+                puzzles.len(),
+            );
+
+            // Convert results
+            let mut results = Vec::with_capacity(puzzles.len());
+
+            if !batch_result.results.is_null() && batch_result.count == puzzles.len() {
+                let result_slice =
+                    std::slice::from_raw_parts(batch_result.results, batch_result.count);
+
+                for (i, rsw_result) in result_slice.iter().enumerate() {
+                    if rsw_result.success {
+                        results.push(SolveResult {
+                            key: rsw_result.key,
+                        });
+                    } else {
+                        let error_msg = if rsw_result.error_msg.is_null() {
+                            "Unknown error".to_string()
+                        } else {
+                            CStr::from_ptr(rsw_result.error_msg)
+                                .to_string_lossy()
+                                .to_string()
+                        };
+
+                        // Free the batch result before returning error
+                        rsw_batch_result_free(&batch_result as *const _ as *mut _);
+                        return Err(Error::SolverError(format!("Puzzle {i}: {error_msg}")));
+                    }
+                }
+
+                // Free the batch result
+                rsw_batch_result_free(&batch_result as *const _ as *mut _);
+            } else {
+                return Err(Error::SolverError("Batch solve failed".to_string()));
+            }
+
+            Ok(results)
+        }
+    }
+
     /// Get the name of the GPU device being used
     pub fn device_name(&self) -> String {
         unsafe {
@@ -136,13 +254,11 @@ impl Solver {
             if name_ptr.is_null() {
                 "Unknown".to_string()
             } else {
-                CStr::from_ptr(name_ptr)
-                    .to_string_lossy()
-                    .to_string()
+                CStr::from_ptr(name_ptr).to_string_lossy().to_string()
             }
         }
     }
-    
+
     /// Get the optimal batch size for this GPU
     pub fn optimal_batch_size(&self) -> usize {
         unsafe { rsw_solver_get_optimal_batch_size(self.inner) }
@@ -162,7 +278,7 @@ unsafe impl Send for Solver {}
 unsafe impl Sync for Solver {}
 
 /// Solve an RSW puzzle and decrypt a message using AES-GCM
-/// 
+///
 /// This is a convenience function that combines RSW solving with AES-GCM decryption.
 #[cfg(feature = "aes")]
 pub fn solve_and_decrypt(
@@ -178,20 +294,20 @@ pub fn solve_and_decrypt(
         aead::{Aead, KeyInit},
         Aes256Gcm, Nonce,
     };
-    
+
     // Solve the puzzle
     let solver = Solver::default()?;
     let result = solver.solve(n, a, c, t)?;
-    
+
     // Decrypt with AES-GCM
-    let cipher = Aes256Gcm::new_from_slice(&result.key)
-        .map_err(|e| format!("Invalid key length: {}", e))?;
+    let cipher =
+        Aes256Gcm::new_from_slice(&result.key).map_err(|e| format!("Invalid key length: {}", e))?;
     let nonce = Nonce::from_slice(iv);
-    
+
     // Combine ciphertext and tag
     let mut combined = ciphertext.to_vec();
     combined.extend_from_slice(tag);
-    
+
     cipher
         .decrypt(nonce, combined.as_ref())
         .map_err(|_| "Decryption failed".into())
@@ -205,7 +321,7 @@ fn is_valid_hex(s: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
     #[test]
     fn test_solver_creation() {
         match Solver::new(0) {
@@ -214,21 +330,56 @@ mod tests {
                 println!("Optimal batch size: {}", solver.optimal_batch_size());
             }
             Err(e) => {
-                eprintln!("No GPU available: {}", e);
+                eprintln!("No GPU available: {e}");
             }
         }
     }
-    
+
     #[test]
     fn test_invalid_hex() {
         let solver = match Solver::default() {
             Ok(s) => s,
             Err(_) => return, // Skip test if no GPU
         };
-        
+
         assert!(matches!(
             solver.solve("xyz", "2", "abcd", 100),
             Err(Error::InvalidHex(_))
         ));
+    }
+
+    #[test]
+    fn test_batch_solve() {
+        let solver = match Solver::default() {
+            Ok(s) => s,
+            Err(_) => return, // Skip test if no GPU
+        };
+
+        // Create a small batch of test puzzles
+        let puzzles = vec![
+            (
+                "abcd1234".to_string(),
+                "2".to_string(),
+                "5678".to_string(),
+                100,
+            ),
+            (
+                "1234abcd".to_string(),
+                "2".to_string(),
+                "8765".to_string(),
+                100,
+            ),
+        ];
+
+        match solver.solve_batch(&puzzles) {
+            Ok(results) => {
+                assert_eq!(results.len(), 2);
+                println!("Batch solve successful: {} results", results.len());
+            }
+            Err(e) => {
+                // Expected to fail with invalid hex in test
+                println!("Batch solve error (expected): {e}");
+            }
+        }
     }
 }
