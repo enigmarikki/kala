@@ -13,13 +13,13 @@
 
 ## Disclaimer
 
-All claims, content, designs, algorithms, estimates, roadmaps, specifications, and performance measurements described in this project are provided with the author’s best effort. You are encouraged to validate their accuracy and truthfulness independently. Nothing in this project constitutes a solicitation for investment.
+All claims, content, designs, algorithms, estimates, roadmaps, specifications, and performance measurements described in this project are provided with the author's best effort. You are encouraged to validate their accuracy and truthfulness independently. Nothing in this project constitutes a solicitation for investment.
 
 ---
 
 ## Overview
 
-Kala is a high-performance, VDF-based blockchain architecture designed for trustless, verifiable timestamping and consensus. By leveraging sequential modular squaring in class groups and integrating RSW timelock puzzles for MEV mitigation, Kala constructs an eternal, fork-free timeline of fixed “ticks,” enabling:
+Kala is a high-performance, VDF-based blockchain architecture designed for trustless, verifiable timestamping and consensus. By leveraging sequential modular squaring in class groups and integrating RSW timelock puzzles for MEV mitigation, Kala constructs an eternal, fork-free timeline of fixed "ticks," enabling:
 
 * Unforgeable, fine-grained timestamping at the iteration level
 * Leader-based, fork-free consensus at the tick level
@@ -42,6 +42,69 @@ For full technical details, see the [project whitepaper](https://github.com/enig
   ```
 * **Git**
 * **GNU Make** (optional, for build scripts)
+
+---
+
+## System Dependencies
+
+### Required Build Tools & Libraries
+
+To build Kala from source, you'll need the following system dependencies:
+
+#### Core Build Tools
+* **GCC/G++** - GNU Compiler Collection
+* **Clang/LLVM** - Required for bindgen and some Rust crates
+* **CMake** - Cross-platform build system
+* **pkg-config** - Helper tool for compiling applications
+
+#### Required Libraries
+* **libgmp-dev** - GNU Multiple Precision Arithmetic Library
+* **libclang-dev** - Clang development libraries (for bindgen)
+* **m4** - Macro processor (required for GMP builds)
+* **autoconf/automake/libtool** - GNU build system tools
+
+#### CUDA Support (if using GPU features)
+* **CUDA Toolkit** - NVIDIA CUDA development tools
+* **cudart** - CUDA runtime library
+
+#### Additional Dependencies
+* **FlatBuffers** (flatc) - Efficient serialization library
+
+### Installation
+
+#### Ubuntu/Debian
+```bash
+sudo apt-get update && sudo apt-get install -y \
+    build-essential \
+    gcc \
+    g++ \
+    libgmp-dev \
+    cmake \
+    git \
+    pkg-config \
+    libclang-dev \
+    clang \
+    llvm-dev \
+    m4 \
+    autoconf \
+    automake \
+    libtool \
+    flatbuffers
+```
+
+#### macOS
+```bash
+# Install Xcode Command Line Tools
+xcode-select --install
+
+# Using Homebrew
+brew install gmp cmake pkg-config llvm flatbuffers m4 autoconf automake libtool
+```
+
+#### Arch Linux
+```bash
+sudo pacman -S base-devel gcc gmp cmake pkgconf clang llvm flatbuffers m4 autoconf automake libtool
+```
 
 ---
 
@@ -79,6 +142,8 @@ This will start the node and begin VDF tick computation immediately. The main RP
 http://127.0.0.1:8545
 ```
 
+---
+
 ## Testing & Benchmarking
 
 ```bash
@@ -104,16 +169,8 @@ cargo run --release --bin kala-client-demo -- --config client.toml
 
 ---
 
-## Contributing
-
-Contributions are welcome! Please read our [Contributing Guide](./CONTRIBUTING.md) for details on code style, testing, and pull requests.
-
----
-
 ## License
 
 This project is licensed under the **MIT License**. See [LICENSE](./LICENSE) for details.
 
 ---
-
- 
