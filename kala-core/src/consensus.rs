@@ -1,16 +1,16 @@
 use anyhow::Result;
+use sha2::{Digest, Sha256};
 use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
 use tokio::sync::RwLock;
-use tracing::{info, warn, debug};
-use sha2::{Sha256, Digest};
+use tracing::{debug, info, warn};
 
-use kala_vdf::EternalVDF;
 use kala_state::{ChainState, TickCertificate, TickType};
 use kala_transaction::{
-    Transaction, TimelockTransaction, EncryptionContext,
-    decrypt_timelock_batch, decrypt_timelock_transaction,
+    decrypt_timelock_batch, decrypt_timelock_transaction, EncryptionContext, TimelockTransaction,
+    Transaction,
 };
+use kala_vdf::EternalVDF;
 
 pub struct TickProcessor {
     iterations_per_tick: u64,
@@ -21,18 +21,18 @@ pub struct TickProcessor {
 impl TickProcessor {
     pub fn new(iterations_per_tick: u64, tick_duration_ms: u64) -> Self {
         let encryption_ctx = Arc::new(EncryptionContext::new(iterations_per_tick));
-        
+
         Self {
             iterations_per_tick,
             tick_duration_ms,
             encryption_ctx,
         }
     }
-    
+
     pub fn encryption_context(&self) -> Arc<EncryptionContext> {
         self.encryption_ctx.clone()
     }
-    
+
     pub async fn process_tick(
         &self,
         tick_num: u64,
@@ -42,26 +42,30 @@ impl TickProcessor {
     ) -> Result<TickCertificate> {
         let k = self.iterations_per_tick;
         let tick_start_iter = tick_num * k;
-        
+
         // Update encryption context with current tick
         self.encryption_ctx.update_tick(tick_num);
-        
+
         // Phase boundaries as per the paper
         let collection_phase_end = k / 3;
         let consensus_phase_end = 2 * k / 3;
-        
-        info!("Tick {}: Starting with {} encrypted transactions", tick_num, encrypted_txs.len());
-        
+
+        info!(
+            "Tick {}: Starting with {} encrypted transactions",
+            tick_num,
+            encrypted_txs.len()
+        );
+
         // Phase 1: Collection (0 to k/3)
         // Leader timestamps transactions as they arrive (from the paper)
         info!("Tick {}: Phase 1 - Collection phase", tick_num);
-        
+
         // Track which transactions we've timestamped
         let mut timestamped_indices = Vec::new();
-        
+
         for i in 0..collection_phase_end {
             let mut vdf_write = vdf.write().await;
-            
+
             // Check if we should timestamp a transaction at this iteration
             // Transactions are timestamped at their submission_iteration
             for (idx, tx) in encrypted_txs.iter().enumerate() {
@@ -69,39 +73,41 @@ impl TickProcessor {
                 if tx.submission_iteration == current_iter && !timestamped_indices.contains(&idx) {
                     // Timestamp the encrypted transaction data
                     let tx_data = Self::serialize_timelock_tx(tx);
-                    debug!("Timestamping transaction {} at iteration {}", idx, current_iter);
+                    debug!(
+                        "Timestamping transaction {} at iteration {}",
+                        idx, current_iter
+                    );
                     vdf_write.step(Some(tx_data));
                     timestamped_indices.push(idx);
                     break; // Only one transaction per iteration
                 }
             }
-            
+
             // If no transaction to timestamp, just advance VDF
             if !timestamped_indices.iter().any(|&idx| {
                 encrypted_txs[idx].submission_iteration == vdf_write.get_iteration() + 1
             }) {
                 vdf_write.step(None);
             }
-            
+
             drop(vdf_write);
-            
         }
-        
+
         // Phase 2: Ordering (at k/3)
         // For single node, order by submission iteration (already timestamped in VDF)
         info!("Tick {}: Phase 2 - Ordering transactions", tick_num);
         let mut ordered_txs = encrypted_txs;
         ordered_txs.sort_by_key(|tx| tx.submission_iteration);
-        
+
         // Timestamp the ordering decision
         let ordering_data = Self::create_ordering_commitment(&ordered_txs);
         let mut vdf_write = vdf.write().await;
         vdf_write.step(Some(ordering_data));
         drop(vdf_write);
-        
+
         // Phase 3: Parallel Decryption (k/3 to 2k/3)
         info!("Tick {}: Phase 3 - Parallel decryption phase", tick_num);
-        
+
         // Start parallel decryption using GPU batch processing
         let decrypt_handle = tokio::spawn({
             let txs = ordered_txs.clone();
@@ -123,28 +129,28 @@ impl TickProcessor {
                 }
             }
         });
-        
+
         // Continue VDF during decryption (no data to timestamp during this phase)
         for i in collection_phase_end + 1..consensus_phase_end {
             let mut vdf_write = vdf.write().await;
             vdf_write.step(None);
             drop(vdf_write);
-            
-            if i % 100 == 0 {
-                tokio::time::sleep(tokio::time::Duration::from_micros(760)).await;
-            }
         }
-        
+
         // Wait for decryption to complete
         let decrypted_txs = decrypt_handle.await?;
-        info!("Tick {}: Decrypted {} transactions", tick_num, decrypted_txs.len());
-        
+        info!(
+            "Tick {}: Decrypted {} transactions",
+            tick_num,
+            decrypted_txs.len()
+        );
+
         // Phase 4: Validation and State Updates (2k/3 to k)
         info!("Tick {}: Phase 4 - Validation and finalization", tick_num);
-        
+
         let mut valid_txs = Vec::new();
         let mut state_write = state.write().await;
-        
+
         for tx in decrypted_txs {
             if Self::validate_transaction(&tx, &state_write) {
                 if let Err(e) = Self::apply_transaction(&tx, &mut state_write) {
@@ -154,80 +160,87 @@ impl TickProcessor {
                 valid_txs.push(tx);
             }
         }
-        
+
         // Update state with VDF progress
         state_write.total_transactions += valid_txs.len() as u64;
-        
+
         drop(state_write);
-        
-        info!("Tick {}: {} valid transactions after validation", tick_num, valid_txs.len());
-        
+
+        info!(
+            "Tick {}: {} valid transactions after validation",
+            tick_num,
+            valid_txs.len()
+        );
+
         // Timestamp final transaction set merkle root
         let tx_merkle_root = Self::compute_transaction_merkle_root(&valid_txs);
         let mut vdf_write = vdf.write().await;
         vdf_write.step(Some(tx_merkle_root.to_vec()));
         drop(vdf_write);
-        
+
         // Complete remaining VDF iterations
         let vdf_read = vdf.read().await;
-        let current_iter = vdf_read.get_iteration();
+        let current = vdf_read.get_iteration();
         drop(vdf_read);
-        
-        let remaining = k - (current_iter % k) - 1;
+
+        let target = (tick_num + 1) * k; // where we must end
+        let remaining = target - current;
+
         for i in 0..remaining {
             let mut vdf_write = vdf.write().await;
             vdf_write.step(None);
             drop(vdf_write);
-            
-            if i % 100 == 0 {
-                tokio::time::sleep(tokio::time::Duration::from_micros(760)).await;
-            }
         }
-        
+
         // Create unified tick certificate
-        let certificate = self.create_unified_certificate(
-            tick_num, 
-            valid_txs, 
-            tx_merkle_root,
-            vdf.clone(), 
-            state.clone()
-        ).await?;
-        
+        let certificate = self
+            .create_unified_certificate(
+                tick_num,
+                valid_txs,
+                tx_merkle_root,
+                vdf.clone(),
+                state.clone(),
+            )
+            .await?;
+
         // Update chain state
         let mut state_write = state.write().await;
         state_write.current_tick = tick_num + 1;
         state_write.last_tick_hash = certificate.tick_hash;
-        
+
         // Get VDF checkpoint for state update
         let vdf_read = vdf.read().await;
         let vdf_checkpoint = vdf_read.checkpoint();
         state_write.update_from_vdf_checkpoint(vdf_checkpoint);
         drop(vdf_read);
         drop(state_write);
-        
-        info!("Tick {}: Completed with certificate hash {:?}", 
-              tick_num, hex::encode(&certificate.tick_hash));
-        
+
+        info!(
+            "Tick {}: Completed with certificate hash {:?}",
+            tick_num,
+            hex::encode(&certificate.tick_hash)
+        );
+
         Ok(certificate)
     }
-    
+
     fn serialize_timelock_tx(tx: &TimelockTransaction) -> Vec<u8> {
         // Serialize the encrypted transaction for timestamping
         let mut data = Vec::new();
         data.extend_from_slice(&tx.submission_iteration.to_le_bytes());
         data.extend_from_slice(&tx.target_tick.to_le_bytes());
-        
+
         // Serialize SealedTransaction
         data.extend_from_slice(&tx.encrypted_data.nonce);
         data.extend_from_slice(&tx.encrypted_data.tag);
         data.extend_from_slice(&tx.encrypted_data.ciphertext);
-        
+
         // Include puzzle hardness for ordering
         data.extend_from_slice(&tx.puzzle.hardness.to_le_bytes());
-        
+
         data
     }
-    
+
     fn create_ordering_commitment(txs: &[TimelockTransaction]) -> Vec<u8> {
         let mut hasher = Sha256::new();
         hasher.update(b"ordering");
@@ -242,14 +255,12 @@ impl TickProcessor {
         }
         hasher.finalize().to_vec()
     }
-    
+
     fn compute_transaction_merkle_root(txs: &[Transaction]) -> [u8; 32] {
-        let hashes: Vec<[u8; 32]> = txs.iter()
-            .map(|tx| Self::hash_transaction(tx))
-            .collect();
+        let hashes: Vec<[u8; 32]> = txs.iter().map(|tx| Self::hash_transaction(tx)).collect();
         compute_merkle_root(&hashes)
     }
-    
+
     fn validate_transaction(tx: &Transaction, state: &ChainState) -> bool {
         // Get sender address from transaction
         let sender = match tx {
@@ -258,7 +269,7 @@ impl TickProcessor {
             Transaction::Stake(s) => &s.sender,
             Transaction::Solve(s) => &s.sender,
         };
-        
+
         // Get nonce from transaction
         let tx_nonce = match tx {
             Transaction::Send(s) => s.nonce,
@@ -266,15 +277,18 @@ impl TickProcessor {
             Transaction::Stake(s) => s.nonce,
             Transaction::Solve(s) => s.nonce,
         };
-        
+
         // Check nonce
         if let Some(account_nonce) = state.get_account_nonce(sender) {
             if tx_nonce <= account_nonce {
-                warn!("Invalid nonce: tx {} <= account {}", tx_nonce, account_nonce);
+                warn!(
+                    "Invalid nonce: tx {} <= account {}",
+                    tx_nonce, account_nonce
+                );
                 return false;
             }
         }
-        
+
         // Check balance for transfers
         match tx {
             Transaction::Send(send) => {
@@ -291,10 +305,10 @@ impl TickProcessor {
             }
             _ => {}
         }
-        
+
         true
     }
-    
+
     fn apply_transaction(tx: &Transaction, state: &mut ChainState) -> Result<()> {
         match tx {
             Transaction::Send(send) => {
@@ -314,10 +328,10 @@ impl TickProcessor {
                 state.update_nonce(&solve.sender, solve.nonce);
             }
         }
-        
+
         Ok(())
     }
-    
+
     async fn create_unified_certificate(
         &self,
         tick_num: u64,
@@ -328,26 +342,30 @@ impl TickProcessor {
     ) -> Result<TickCertificate> {
         let vdf_read = vdf.read().await;
         let state_read = state.read().await;
-        
+
         // Get VDF tick certificate if available
         let vdf_tick_cert = vdf_read.get_tick_certificate(tick_num);
-        
+
         // Determine tick type based on paper's classification
         let tick_type = if transactions.is_empty() {
             TickType::Empty
         } else {
             TickType::Full
         };
-        
+
         // Get VDF state from checkpoint
         let vdf_checkpoint = vdf_read.checkpoint();
-        
+
         // Create unified certificate that combines VDF and consensus data
         let certificate = TickCertificate {
             tick_number: tick_num,
             tick_type,
             vdf_iteration: vdf_checkpoint.iteration,
-            vdf_form: (vdf_checkpoint.form_a.clone(), vdf_checkpoint.form_b.clone(), vdf_checkpoint.form_c.clone()),
+            vdf_form: (
+                vdf_checkpoint.form_a.clone(),
+                vdf_checkpoint.form_b.clone(),
+                vdf_checkpoint.form_c.clone(),
+            ),
             hash_chain_value: vdf_checkpoint.hash_chain,
             tick_hash: [0; 32], // Will be computed below
             transaction_count: transactions.len() as u32,
@@ -355,17 +373,17 @@ impl TickProcessor {
             timestamp: SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs(),
             previous_tick_hash: state_read.last_tick_hash,
         };
-        
+
         // Compute tick hash
         let mut cert_with_hash = certificate;
         cert_with_hash.tick_hash = cert_with_hash.compute_hash();
-        
+
         Ok(cert_with_hash)
     }
-    
+
     fn hash_transaction(tx: &Transaction) -> [u8; 32] {
         let mut hasher = Sha256::new();
-        
+
         // Hash based on transaction type
         match tx {
             Transaction::Send(send) => {
@@ -401,10 +419,10 @@ impl TickProcessor {
                 hasher.update(&solve.signature);
             }
         }
-        
+
         hasher.finalize().into()
     }
-    
+
     // Graceful degradation for failed ticks (Algorithm 4 from paper)
     pub async fn handle_tick_failure(
         &self,
@@ -416,30 +434,35 @@ impl TickProcessor {
         let k = self.iterations_per_tick;
         let tick_end = (tick_num + 1) * k;
         let remaining = tick_end - current_iteration;
-        
-        warn!("Tick {}: Handling failure with {} iterations remaining", tick_num, remaining);
-        
+
+        warn!(
+            "Tick {}: Handling failure with {} iterations remaining",
+            tick_num, remaining
+        );
+
         // Complete remaining VDF iterations without timestamping
         for _ in 0..remaining {
             let mut vdf_write = vdf.write().await;
             vdf_write.step(None);
             drop(vdf_write);
-            
-            tokio::time::sleep(tokio::time::Duration::from_micros(7)).await;
         }
-        
+
         // Create checkpoint tick (no transactions)
         let vdf_read = vdf.read().await;
         let state_read = state.read().await;
-        
+
         // Get VDF state
         let vdf_checkpoint = vdf_read.checkpoint();
-        
+
         let certificate = TickCertificate {
             tick_number: tick_num,
             tick_type: TickType::Checkpoint,
             vdf_iteration: vdf_checkpoint.iteration,
-            vdf_form: (vdf_checkpoint.form_a.clone(), vdf_checkpoint.form_b.clone(), vdf_checkpoint.form_c.clone()),
+            vdf_form: (
+                vdf_checkpoint.form_a.clone(),
+                vdf_checkpoint.form_b.clone(),
+                vdf_checkpoint.form_c.clone(),
+            ),
             hash_chain_value: vdf_checkpoint.hash_chain,
             tick_hash: [0; 32],
             transaction_count: 0,
@@ -447,19 +470,19 @@ impl TickProcessor {
             timestamp: SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs(),
             previous_tick_hash: state_read.last_tick_hash,
         };
-        
+
         let mut cert_with_hash = certificate;
         cert_with_hash.tick_hash = cert_with_hash.compute_hash();
-        
+
         // Update state even for checkpoint
         drop(state_read);
         let mut state_write = state.write().await;
         state_write.current_tick = tick_num + 1;
         state_write.last_tick_hash = cert_with_hash.tick_hash;
-        
+
         let vdf_checkpoint = vdf_read.checkpoint();
         state_write.update_from_vdf_checkpoint(vdf_checkpoint);
-        
+
         Ok(cert_with_hash)
     }
 }
@@ -468,12 +491,12 @@ fn compute_merkle_root(hashes: &[[u8; 32]]) -> [u8; 32] {
     if hashes.is_empty() {
         return [0; 32];
     }
-    
+
     let mut current = hashes.to_vec();
-    
+
     while current.len() > 1 {
         let mut next = Vec::new();
-        
+
         for chunk in current.chunks(2) {
             let mut hasher = Sha256::new();
             hasher.update(&chunk[0]);
@@ -485,9 +508,9 @@ fn compute_merkle_root(hashes: &[[u8; 32]]) -> [u8; 32] {
             }
             next.push(hasher.finalize().into());
         }
-        
+
         current = next;
     }
-    
+
     current[0]
 }

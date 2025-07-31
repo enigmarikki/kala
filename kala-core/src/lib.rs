@@ -1,25 +1,25 @@
 // lib.rs - Kala Core Library
 //! # Kala Core
-//! 
+//!
 //! The core implementation of Kala: The Immutability of Time.
-//! 
+//!
 //! This crate provides the fundamental components for running a Kala node,
 //! including the eternal VDF computation, consensus mechanism, and timelock
 //! transaction processing.
-//! 
+//!
 //! ## Architecture
-//! 
+//!
 //! - **Eternal VDF**: Continuous computation creating an unstoppable timeline
 //! - **Tick-based Consensus**: Fixed epochs of 65,536 iterations
 //! - **RSW Timelock**: MEV protection through temporal encryption
 //! - **Single Node**: Simplified implementation for demonstration
-//! 
+//!
 //! ## Example
-//! 
+//!
 //! ```no_run
 //! use kala_core::{NodeConfig, KalaNode};
 //! use std::sync::Arc;
-//! 
+//!
 //! #[tokio::main]
 //! async fn main() -> Result<(), Box<dyn std::error::Error>> {
 //!     // Create node with default config
@@ -71,7 +71,7 @@ pub const DEFAULT_TICK_DURATION_MS: u64 = 497;
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
     #[test]
     fn test_constants() {
         assert_eq!(DEFAULT_ITERATIONS_PER_TICK, 65536);

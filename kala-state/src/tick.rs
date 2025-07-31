@@ -1,6 +1,6 @@
-use serde::{Deserialize, Serialize};
 use bincode::{Decode, Encode};
-use sha2::{Sha256, Digest};
+use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
 #[derive(Serialize, Deserialize, Encode, Decode, Clone)]
 pub struct TickCertificate {
     pub tick_number: u64,
@@ -18,7 +18,7 @@ pub struct TickCertificate {
 #[derive(Serialize, Deserialize, Encode, Decode, Clone, Debug)]
 pub enum TickType {
     Full,       // Contains validated transactions with consensus
-    Empty,      // Consensus achieved but no transactions included  
+    Empty,      // Consensus achieved but no transactions included
     Checkpoint, // No consensus - only VDF proof preserved
 }
 

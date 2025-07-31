@@ -1,5 +1,5 @@
-use serde::{Deserialize, Serialize};
 use bincode::{Decode, Encode};
+use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Encode, Decode, Clone, Debug)]
 pub struct Account {

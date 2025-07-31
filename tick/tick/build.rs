@@ -5,26 +5,32 @@ fn main() {
     // Get the directory where build.rs is located
     let manifest_dir = env::var("CARGO_MANIFEST_DIR").unwrap();
     println!("cargo:warning=CARGO_MANIFEST_DIR: {}", manifest_dir);
-    
+
     // The C++ files are in the parent tick directory, not in tick/tick
     let src_dir = PathBuf::from(&manifest_dir).parent().unwrap().join("src");
-    println!("cargo:warning=Looking for libtick.a in: {}", src_dir.display());
-    
+    println!(
+        "cargo:warning=Looking for libtick.a in: {}",
+        src_dir.display()
+    );
+
     // Check if library exists
     let lib_path = src_dir.join("libtick.a");
     if lib_path.exists() {
         println!("cargo:warning=Found libtick.a at: {}", lib_path.display());
     } else {
-        println!("cargo:warning=ERROR: libtick.a not found at: {}", lib_path.display());
+        println!(
+            "cargo:warning=ERROR: libtick.a not found at: {}",
+            lib_path.display()
+        );
         panic!("libtick.a not found. Please run 'make' in the src directory first.");
     }
-    
+
     // Disable PIE - put this FIRST before other link args
     println!("cargo:rustc-link-arg=-no-pie");
-    
+
     // Tell cargo to look for the static library using absolute path
     println!("cargo:rustc-link-search=native={}", src_dir.display());
-    
+
     // Link against libtick.a
     println!("cargo:rustc-link-lib=static=tick");
 
@@ -35,7 +41,10 @@ fn main() {
     println!("cargo:rustc-link-lib=stdc++");
 
     // Tell cargo to invalidate the built crate whenever files change
-    println!("cargo:rerun-if-changed={}", src_dir.join("tick.h").display());
+    println!(
+        "cargo:rerun-if-changed={}",
+        src_dir.join("tick.h").display()
+    );
     println!("cargo:rerun-if-changed={}", lib_path.display());
 
     // Use bindgen to generate Rust bindings

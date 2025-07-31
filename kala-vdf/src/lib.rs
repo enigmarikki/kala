@@ -1,9 +1,9 @@
-use sha2::{Sha256, Digest};
-use serde::{Deserialize, Serialize};
-use tick::{VdfForm, Reducer, nudupl_form_inplace, init};
-use std::sync::{Once, Arc, Mutex};
-use std::collections::HashMap;
 use bincode::{Decode, Encode};
+use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
+use std::collections::HashMap;
+use std::sync::{Arc, Mutex, Once};
+use tick::{init, nudupl_form_inplace, Reducer, VdfForm};
 
 static INIT: Once = Once::new();
 
@@ -27,7 +27,7 @@ unsafe impl Sync for VdfInternals {}
 pub struct TimestampedData {
     pub iteration: u64,
     pub data: Vec<u8>,
-    pub data_hash: [u8; 32],  // H(data) for efficiency
+    pub data_hash: [u8; 32], // H(data) for efficiency
 }
 
 /// Merkle tree node for efficient proofs
@@ -41,14 +41,14 @@ pub struct MerkleNode {
 /// Tick certificate - stored every k iterations
 #[derive(Clone, Debug, Serialize, Deserialize, Encode, Decode)]
 pub struct TickCertificate {
-    pub tick_number: u64,          // i = iteration / k
-    pub start_iteration: u64,      // i * k
-    pub end_iteration: u64,        // (i + 1) * k
-    pub form_a: String,            // VDF state at end
+    pub tick_number: u64,     // i = iteration / k
+    pub start_iteration: u64, // i * k
+    pub end_iteration: u64,   // (i + 1) * k
+    pub form_a: String,       // VDF state at end
     pub form_b: String,
     pub form_c: String,
-    pub hash_chain: [u8; 32],      // h_(i+1)k
-    pub data_merkle_root: [u8; 32], // Root of all data in this tick
+    pub hash_chain: [u8; 32],              // h_(i+1)k
+    pub data_merkle_root: [u8; 32],        // Root of all data in this tick
     pub wesolowski_proof: Option<Vec<u8>>, // π for efficient verification
 }
 
@@ -65,7 +65,7 @@ pub struct EternalVDF {
     discriminant: String,
     // Tick size k (default 65536)
     tick_size: u64,
-    
+
     // Production storage:
     // Only store tick certificates, not full history
     tick_certificates: Arc<Mutex<HashMap<u64, TickCertificate>>>,
@@ -80,23 +80,23 @@ impl EternalVDF {
     pub fn new(discriminant: &str) -> Self {
         Self::with_tick_size(discriminant, 65536)
     }
-    
+
     pub fn with_tick_size(discriminant: &str, tick_size: u64) -> Self {
         initialize_vdf();
-        
+
         // h0 ← H("genesis")
         let mut hasher = Sha256::new();
         hasher.update(b"genesis");
         let genesis_hash = hasher.finalize().into();
-        
+
         // f0 ← g (generator)
         let form = VdfForm::generator(discriminant);
-        
+
         let internals = VdfInternals {
             current_form: form,
             reducer: Reducer::new(),
         };
-        
+
         Self {
             iteration: 0,
             internals: Arc::new(Mutex::new(internals)),
@@ -108,26 +108,26 @@ impl EternalVDF {
             important_timestamps: Arc::new(Mutex::new(HashMap::new())),
         }
     }
-    
+
     /// Load from a checkpoint (tick boundary)
     pub fn from_checkpoint(checkpoint: &VDFCheckpoint) -> Result<Self, String> {
         initialize_vdf();
-        
+
         let mut form = VdfForm::new();
         form.set_a(&checkpoint.form_a);
         form.set_b(&checkpoint.form_b);
         form.set_c(&checkpoint.form_c);
-        
+
         let internals = VdfInternals {
             current_form: form,
             reducer: Reducer::new(),
         };
-        
+
         let mut tick_certs = HashMap::new();
         for cert in &checkpoint.tick_certificates {
             tick_certs.insert(cert.tick_number, cert.clone());
         }
-        
+
         Ok(Self {
             iteration: checkpoint.iteration,
             internals: Arc::new(Mutex::new(internals)),
@@ -139,29 +139,32 @@ impl EternalVDF {
             important_timestamps: Arc::new(Mutex::new(HashMap::new())),
         })
     }
-    
+
     /// Core computation step following Algorithm 1
     pub fn step(&mut self, data_to_timestamp: Option<Vec<u8>>) {
         let mut internals = self.internals.lock().unwrap();
-        
+
         // fi ← fi-1^2 (mod D) - VDF step
         nudupl_form_inplace(&mut internals.current_form, &self.discriminant);
-        
+
         // Reduce the form
         {
-            let VdfInternals { current_form, reducer } = &mut *internals;
+            let VdfInternals {
+                current_form,
+                reducer,
+            } = &mut *internals;
             reducer.reduce(current_form);
         }
-        
+
         // Increment iteration
         self.iteration += 1;
-        
+
         // Get current form values
         let (form_a, form_b, form_c) = internals.current_form.get_values();
-        
+
         // Drop lock before computing hash
         drop(internals);
-        
+
         // hi ← H(i ∥ fi ∥ hi-1 ∥ di)
         let mut hasher = Sha256::new();
         hasher.update(&self.iteration.to_le_bytes());
@@ -169,11 +172,11 @@ impl EternalVDF {
         hasher.update(form_b.as_bytes());
         hasher.update(form_c.as_bytes());
         hasher.update(&self.hash_chain);
-        
+
         // If we have data to timestamp
         if let Some(data) = data_to_timestamp {
             hasher.update(&data);
-            
+
             // Store in current tick's data
             let data_hash = Sha256::digest(&data).into();
             let ts_data = TimestampedData {
@@ -181,30 +184,30 @@ impl EternalVDF {
                 data,
                 data_hash,
             };
-            
+
             let mut tick_data = self.current_tick_data.lock().unwrap();
             tick_data.push(ts_data);
         }
-        
+
         self.hash_chain = hasher.finalize().into();
-        
+
         // Check if we completed a tick
         if self.iteration % self.tick_size == 0 {
             self.finalize_tick();
         }
     }
-    
+
     /// Finalize a tick and create certificate
     fn finalize_tick(&self) {
         let tick_number = self.iteration / self.tick_size - 1;
         let start_iter = tick_number * self.tick_size;
         let end_iter = self.iteration;
-        
+
         // Get current VDF state
         let internals = self.internals.lock().unwrap();
         let (form_a, form_b, form_c) = internals.current_form.get_values();
         drop(internals);
-        
+
         // Calculate Merkle root of tick's data
         let mut tick_data = self.current_tick_data.lock().unwrap();
         let merkle_root = if tick_data.is_empty() {
@@ -212,7 +215,7 @@ impl EternalVDF {
         } else {
             Self::compute_merkle_root(&tick_data)
         };
-        
+
         // Create tick certificate
         let certificate = TickCertificate {
             tick_number,
@@ -225,33 +228,36 @@ impl EternalVDF {
             data_merkle_root: merkle_root,
             wesolowski_proof: None, // Would compute In multinode setup
         };
-        
+
         // Store certificate
         let mut certs = self.tick_certificates.lock().unwrap();
         certs.insert(tick_number, certificate);
-        
+
         // Clear current tick data (already in Merkle tree)
         tick_data.clear();
     }
-    
+
     /// Compute Merkle root of timestamped data
     fn compute_merkle_root(data: &[TimestampedData]) -> [u8; 32] {
         if data.is_empty() {
             return [0u8; 32];
         }
-        
+
         // Leaf nodes are H(iteration || data_hash)
-        let mut hashes: Vec<[u8; 32]> = data.iter().map(|ts| {
-            let mut hasher = Sha256::new();
-            hasher.update(&ts.iteration.to_le_bytes());
-            hasher.update(&ts.data_hash);
-            hasher.finalize().into()
-        }).collect();
-        
+        let mut hashes: Vec<[u8; 32]> = data
+            .iter()
+            .map(|ts| {
+                let mut hasher = Sha256::new();
+                hasher.update(&ts.iteration.to_le_bytes());
+                hasher.update(&ts.data_hash);
+                hasher.finalize().into()
+            })
+            .collect();
+
         // Build tree bottom-up
         while hashes.len() > 1 {
             let mut next_level = Vec::new();
-            
+
             for chunk in hashes.chunks(2) {
                 let mut hasher = Sha256::new();
                 hasher.update(&chunk[0]);
@@ -262,52 +268,52 @@ impl EternalVDF {
                 }
                 next_level.push(hasher.finalize().into());
             }
-            
+
             hashes = next_level;
         }
-        
+
         hashes[0]
     }
-    
+
     /// Advance without timestamping data
     pub fn advance(&mut self, iterations: u64) {
         for _ in 0..iterations {
             self.step(None);
         }
     }
-    
+
     /// Timestamp data at the next iteration
     pub fn timestamp_data(&mut self, data: Vec<u8>) {
         self.step(Some(data));
     }
-    
+
     /// Get current iteration
     pub fn get_iteration(&self) -> u64 {
         self.iteration
     }
-    
+
     /// Get current form values
     pub fn get_form_values(&self) -> (String, String, String) {
         let checkpoint = self.checkpoint();
         (checkpoint.form_a, checkpoint.form_b, checkpoint.form_c)
     }
-    
+
     /// Get current hash chain value
     pub fn get_hash_chain(&self) -> [u8; 32] {
         self.hash_chain
     }
-    
+
     /// Get current tick number
     pub fn get_current_tick(&self) -> u64 {
         self.iteration / self.tick_size
     }
-    
+
     /// Get tick certificate
     pub fn get_tick_certificate(&self, tick_number: u64) -> Option<TickCertificate> {
         let certs = self.tick_certificates.lock().unwrap();
         certs.get(&tick_number).cloned()
     }
-    
+
     /// Get all tick certificates (for checkpoint)
     pub fn get_all_certificates(&self) -> Vec<TickCertificate> {
         let certs = self.tick_certificates.lock().unwrap();
@@ -315,12 +321,12 @@ impl EternalVDF {
         all_certs.sort_by_key(|c| c.tick_number);
         all_certs
     }
-    
+
     /// Store important data with Merkle proof for long-term verification
     pub fn timestamp_important_data(&mut self, data: Vec<u8>) -> TimestampProof {
         // First timestamp it normally
         self.step(Some(data.clone()));
-        
+
         // Create proof that can be verified later
         let data_hash = Sha256::digest(&data).into();
         let ts_data = TimestampedData {
@@ -328,12 +334,12 @@ impl EternalVDF {
             data: data.clone(),
             data_hash,
         };
-        
+
         // In multinode setup, we'd compute the Merkle path
         // For now, just store it
         let mut important = self.important_timestamps.lock().unwrap();
         important.insert(self.iteration, (ts_data.clone(), vec![]));
-        
+
         TimestampProof {
             iteration: self.iteration,
             tick_number: self.iteration / self.tick_size,
@@ -343,12 +349,12 @@ impl EternalVDF {
             merkle_path: vec![], // Would include actual path
         }
     }
-    
+
     /// Create a checkpoint for persistence
     pub fn checkpoint(&self) -> VDFCheckpoint {
         let internals = self.internals.lock().unwrap();
         let (a, b, c) = internals.current_form.get_values();
-        
+
         VDFCheckpoint {
             iteration: self.iteration,
             form_a: a,
@@ -360,21 +366,20 @@ impl EternalVDF {
             tick_certificates: self.get_all_certificates(),
         }
     }
-    
+
     /// Verify a timestamp proof using tick certificates
     pub fn verify_timestamp_proof(&self, proof: &TimestampProof) -> bool {
         // Get the tick certificate for this proof
         let tick_num = proof.tick_number;
         let certs = self.tick_certificates.lock().unwrap();
-        
+
         if let Some(cert) = certs.get(&tick_num) {
             // In multinode setup, verify:
             // 1. The Merkle path from data to cert.data_merkle_root
             // 2. The VDF proof if needed
             // 3. The iteration is within the tick range
-            
-            proof.iteration >= cert.start_iteration && 
-            proof.iteration < cert.end_iteration
+
+            proof.iteration >= cert.start_iteration && proof.iteration < cert.end_iteration
         } else {
             false
         }
@@ -408,7 +413,7 @@ pub struct TimestampProof {
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
     #[test]
     fn test_vdf_with_tick_certificates() {
         let tick_size = 10; // Small for testing
@@ -416,20 +421,20 @@ mod tests {
             "-141140317794792668862943332656856519378482291428727287413318722089216448567155737094768903643716404517549715385664163360316296284155310058980984373770517398492951860161717960368874227473669336541818575166839209228684755811071416376384551902149780184532086881683576071479646499601330824259260645952517205526679",
             tick_size
         );
-        
+
         // Advance to iteration 5
         vdf.advance(5);
         assert_eq!(vdf.get_iteration(), 5);
-        
+
         // Timestamp data (this will advance to iteration 6)
         vdf.timestamp_data(b"Data in tick 0".to_vec());
         assert_eq!(vdf.get_iteration(), 6);
-        
+
         // Advance to complete tick 0 (need to reach iteration 10)
         vdf.advance(4);
         assert_eq!(vdf.get_iteration(), 10);
         assert_eq!(vdf.get_current_tick(), 1);
-        
+
         // Verify tick 0 certificate exists
         let cert = vdf.get_tick_certificate(0).unwrap();
         assert_eq!(cert.tick_number, 0);
@@ -437,7 +442,7 @@ mod tests {
         assert_eq!(cert.end_iteration, 10);
         assert_ne!(cert.data_merkle_root, [0u8; 32]); // Should have data
     }
-    
+
     #[test]
     fn test_checkpoint_and_restore() {
         let tick_size = 5;
@@ -445,50 +450,50 @@ mod tests {
             "-141140317794792668862943332656856519378482291428727287413318722089216448567155737094768903643716404517549715385664163360316296284155310058980984373770517398492951860161717960368874227473669336541818575166839209228684755811071416376384551902149780184532086881683576071479646499601330824259260645952517205526679",
             tick_size
         );
-        
+
         // Create some ticks
         vdf.advance(5); // Complete tick 0
         vdf.timestamp_data(b"Tick 1 data".to_vec());
         vdf.advance(4); // Complete tick 1
-        
+
         // Checkpoint
         let checkpoint = vdf.checkpoint();
         assert_eq!(checkpoint.iteration, 10);
         assert_eq!(checkpoint.tick_certificates.len(), 2);
-        
+
         // Restore
         let vdf2 = EternalVDF::from_checkpoint(&checkpoint).unwrap();
         assert_eq!(vdf2.get_iteration(), 10);
         assert_eq!(vdf2.get_current_tick(), 2);
-        
+
         // Verify certificates survived
         assert!(vdf2.get_tick_certificate(0).is_some());
         assert!(vdf2.get_tick_certificate(1).is_some());
     }
-    
+
     #[test]
     fn test_important_timestamp_proof() {
         let mut vdf = EternalVDF::with_tick_size(
             "-141140317794792668862943332656856519378482291428727287413318722089216448567155737094768903643716404517549715385664163360316296284155310058980984373770517398492951860161717960368874227473669336541818575166839209228684755811071416376384551902149780184532086881683576071479646499601330824259260645952517205526679",
             20
         );
-        
+
         // Advance to middle of tick
         vdf.advance(15);
-        
+
         // Timestamp important data
         let proof = vdf.timestamp_important_data(b"Critical document".to_vec());
         assert_eq!(proof.iteration, 16);
         assert_eq!(proof.tick_number, 0);
         assert_eq!(proof.data, b"Critical document");
-        
+
         // Complete the tick
         vdf.advance(4);
-        
+
         // Verify the proof
         assert!(vdf.verify_timestamp_proof(&proof));
     }
-    
+
     #[test]
     fn test_merkle_root_computation() {
         let data = vec![
@@ -503,23 +508,21 @@ mod tests {
                 data_hash: Sha256::digest(b"second").into(),
             },
         ];
-        
+
         let root1 = EternalVDF::compute_merkle_root(&data);
         let root2 = EternalVDF::compute_merkle_root(&data);
         assert_eq!(root1, root2); // Deterministic
-        
+
         // Different data should give different root
-        let data2 = vec![
-            TimestampedData {
-                iteration: 1,
-                data: b"different".to_vec(),
-                data_hash: Sha256::digest(b"different").into(),
-            },
-        ];
+        let data2 = vec![TimestampedData {
+            iteration: 1,
+            data: b"different".to_vec(),
+            data_hash: Sha256::digest(b"different").into(),
+        }];
         let root3 = EternalVDF::compute_merkle_root(&data2);
         assert_ne!(root1, root3);
     }
-    
+
     #[test]
     fn test_vdf_thread_safety() {
         let vdf = EternalVDF::new("-141140317794792668862943332656856519378482291428727287413318722089216448567155737094768903643716404517549715385664163360316296284155310058980984373770517398492951860161717960368874227473669336541818575166839209228684755811071416376384551902149780184532086881683576071479646499601330824259260645952517205526679");

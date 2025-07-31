@@ -6,35 +6,35 @@ use std::path::PathBuf;
 pub struct NodeConfig {
     /// Path to the state database
     pub db_path: String,
-    
+
     /// RPC server port
     pub rpc_port: u16,
-    
+
     /// Number of VDF iterations per tick (k)
     pub iterations_per_tick: u64,
-    
+
     /// Target duration for each tick in milliseconds
     pub tick_duration_ms: u64,
-    
+
     /// Timelock hardness factor (0.0 to 1.0)
     /// Determines RSW puzzle difficulty as fraction of tick
     pub timelock_hardness_factor: f64,
-    
+
     /// Enable GPU acceleration for RSW puzzle solving
     pub enable_gpu: bool,
-    
+
     /// Maximum transactions per tick
     pub max_transactions_per_tick: usize,
-    
+
     /// Network discriminant for VDF (must match across all nodes)
     pub discriminant: String,
-    
+
     /// Log level (trace, debug, info, warn, error)
     pub log_level: String,
-    
+
     /// Enable metrics collection
     pub enable_metrics: bool,
-    
+
     /// Metrics port
     pub metrics_port: u16,
 }
@@ -64,27 +64,27 @@ impl NodeConfig {
         if self.iterations_per_tick == 0 {
             return Err("iterations_per_tick must be greater than 0".into());
         }
-        
+
         if self.tick_duration_ms == 0 {
             return Err("tick_duration_ms must be greater than 0".into());
         }
-        
+
         if self.timelock_hardness_factor < 0.0 || self.timelock_hardness_factor > 1.0 {
             return Err("timelock_hardness_factor must be between 0.0 and 1.0".into());
         }
-        
+
         if self.discriminant.is_empty() {
             return Err("discriminant cannot be empty".into());
         }
-        
+
         Ok(())
     }
-    
+
     /// Get the database path as PathBuf
     pub fn db_path(&self) -> PathBuf {
         PathBuf::from(&self.db_path)
     }
-    
+
     /// Calculate timelock hardness for current tick position
     pub fn calculate_timelock_hardness(&self, remaining_iterations: u64) -> u32 {
         let max_hardness = (self.iterations_per_tick as f64 * self.timelock_hardness_factor) as u32;

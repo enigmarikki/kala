@@ -1,30 +1,30 @@
+use serde::{Deserialize, Serialize};
 use thiserror::Error;
-use serde::{Serialize, Deserialize};
 
 #[derive(Error, Debug)]
 pub enum TransactionError {
     #[error("Invalid byte array size: expected {expected}, got {actual}")]
     InvalidSize { expected: usize, actual: usize },
-    
+
     #[error("Serialization error: {0}")]
     SerializationError(String),
-    
+
     #[error("Encryption error: {0}")]
     EncryptionError(String),
-    
+
     #[error("Decryption error: {0}")]
     DecryptionError(String),
-    
+
     #[error("Invalid transaction format: {0}")]
     InvalidFormat(String),
-    
+
     #[error("Flatbuffer error: {0}")]
     FlatbufferError(String),
 }
 
 pub type Result<T> = std::result::Result<T, TransactionError>;
 
-pub use crate::generated::tx::{Bytes32, Bytes128, Nonce96, Tag128};
+pub use crate::generated::tx::{Bytes128, Bytes32, Nonce96, Tag128};
 
 // Helper type aliases
 pub type Bytes32Array = [u8; 32];
@@ -52,7 +52,7 @@ pub struct Send {
     pub denom: Bytes32Array,
     pub amount: u64,
     pub nonce: u64,
-    pub signature: Bytes64,  // Now a Vec<u8>
+    pub signature: Bytes64, // Now a Vec<u8>
     pub gas_sponsorer: Bytes32Array,
 }
 
@@ -62,7 +62,7 @@ pub struct Mint {
     pub amount: u64,
     pub denom: Bytes32Array,
     pub nonce: u64,
-    pub signature: Bytes64,  // As Vec<u8>
+    pub signature: Bytes64, // As Vec<u8>
     pub gas_sponsorer: Bytes32Array,
 }
 
@@ -79,10 +79,10 @@ pub struct Stake {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Solve {
     pub sender: Bytes32Array,
-    pub proof: Bytes256,  
+    pub proof: Bytes256,
     pub puzzle_id: Bytes32Array,
     pub nonce: u64,
-    pub signature: Bytes64, 
+    pub signature: Bytes64,
     pub gas_sponsorer: Bytes32Array,
 }
 
@@ -90,7 +90,10 @@ pub struct Solve {
 impl Send {
     pub fn validate(&self) -> Result<()> {
         if self.signature.len() != 64 {
-            return Err(TransactionError::InvalidSize { expected: 64, actual: self.signature.len() });
+            return Err(TransactionError::InvalidSize {
+                expected: 64,
+                actual: self.signature.len(),
+            });
         }
         Ok(())
     }
@@ -99,10 +102,16 @@ impl Send {
 impl Solve {
     pub fn validate(&self) -> Result<()> {
         if self.signature.len() != 64 {
-            return Err(TransactionError::InvalidSize { expected: 64, actual: self.signature.len() });
+            return Err(TransactionError::InvalidSize {
+                expected: 64,
+                actual: self.signature.len(),
+            });
         }
         if self.proof.len() != 256 {
-            return Err(TransactionError::InvalidSize { expected: 256, actual: self.proof.len() });
+            return Err(TransactionError::InvalidSize {
+                expected: 256,
+                actual: self.proof.len(),
+            });
         }
         Ok(())
     }

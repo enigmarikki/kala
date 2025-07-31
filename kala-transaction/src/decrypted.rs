@@ -1,18 +1,15 @@
 // decrypted.rs
-use crate::types::{
-    Result, TransactionError, Transaction, Send, Mint, Stake, Solve,
-};
 use crate::generated::tx::{
-    self, MintTx, MintTxArgs, SendTx, SendTxArgs, 
-    SolveTx, SolveTxArgs, StakeTx, StakeTxArgs, Transaction as TransactionFb, 
-    TransactionArgs, TxBody,
+    self, MintTx, MintTxArgs, SendTx, SendTxArgs, SolveTx, SolveTxArgs, StakeTx, StakeTxArgs,
+    Transaction as TransactionFb, TransactionArgs, TxBody,
 };
+use crate::types::{Mint, Result, Send, Solve, Stake, Transaction, TransactionError};
 use flatbuffers::FlatBufferBuilder;
 
 /// Convert Rust transaction to FlatBuffer format
 pub fn transaction_to_flatbuffer(tx: &Transaction) -> Result<Vec<u8>> {
     let mut fbb = FlatBufferBuilder::new();
-    
+
     let (body_type, body_val) = match tx {
         Transaction::Send(t) => {
             // Create vector offsets for byte arrays
@@ -21,7 +18,7 @@ pub fn transaction_to_flatbuffer(tx: &Transaction) -> Result<Vec<u8>> {
             let denom_vec = fbb.create_vector(&t.denom);
             let signature_vec = fbb.create_vector(&t.signature); // Already a Vec<u8>
             let gas_sponsorer_vec = fbb.create_vector(&t.gas_sponsorer);
-            
+
             let off = SendTx::create(
                 &mut fbb,
                 &SendTxArgs {
@@ -42,7 +39,7 @@ pub fn transaction_to_flatbuffer(tx: &Transaction) -> Result<Vec<u8>> {
             let denom_vec = fbb.create_vector(&t.denom);
             let signature_vec = fbb.create_vector(&t.signature); // Already a Vec<u8>
             let gas_sponsorer_vec = fbb.create_vector(&t.gas_sponsorer);
-            
+
             let off = MintTx::create(
                 &mut fbb,
                 &MintTxArgs {
@@ -62,7 +59,7 @@ pub fn transaction_to_flatbuffer(tx: &Transaction) -> Result<Vec<u8>> {
             let delegation_receiver_vec = fbb.create_vector(&t.delegation_receiver);
             let signature_vec = fbb.create_vector(&t.signature); // Already a Vec<u8>
             let gas_sponsorer_vec = fbb.create_vector(&t.gas_sponsorer);
-            
+
             let off = StakeTx::create(
                 &mut fbb,
                 &StakeTxArgs {
@@ -83,7 +80,7 @@ pub fn transaction_to_flatbuffer(tx: &Transaction) -> Result<Vec<u8>> {
             let puzzle_id_vec = fbb.create_vector(&t.puzzle_id);
             let signature_vec = fbb.create_vector(&t.signature); // Already a Vec<u8>
             let gas_sponsorer_vec = fbb.create_vector(&t.gas_sponsorer);
-            
+
             let off = SolveTx::create(
                 &mut fbb,
                 &SolveTxArgs {
@@ -106,7 +103,7 @@ pub fn transaction_to_flatbuffer(tx: &Transaction) -> Result<Vec<u8>> {
             body: Some(body_val),
         },
     );
-    
+
     fbb.finish(root, None);
     Ok(fbb.finished_data().to_vec())
 }
@@ -143,113 +140,131 @@ fn vec_to_vec(vec: flatbuffers::Vector<u8>, expected_size: Option<usize>) -> Res
 pub fn flatbuffer_to_transaction(bytes: &[u8]) -> Result<Transaction> {
     let tx = tx::root_as_transaction(bytes)
         .map_err(|e| TransactionError::FlatbufferError(format!("Failed to parse: {e}")))?;
-    
+
     let transaction = match tx.body_type() {
         TxBody::SendTx => {
-            let st = tx.body_as_send_tx()
+            let st = tx
+                .body_as_send_tx()
                 .ok_or_else(|| TransactionError::InvalidFormat("Invalid SendTx".to_string()))?;
-            
+
             Transaction::Send(Send {
-                sender: vec_to_array::<32>(
-                    st.sender().ok_or_else(|| TransactionError::InvalidFormat("Missing sender".to_string()))?
-                )?,
-                receiver: vec_to_array::<32>(
-                    st.receiver().ok_or_else(|| TransactionError::InvalidFormat("Missing receiver".to_string()))?
-                )?,
-                denom: vec_to_array::<32>(
-                    st.denom().ok_or_else(|| TransactionError::InvalidFormat("Missing denom".to_string()))?
-                )?,
+                sender: vec_to_array::<32>(st.sender().ok_or_else(|| {
+                    TransactionError::InvalidFormat("Missing sender".to_string())
+                })?)?,
+                receiver: vec_to_array::<32>(st.receiver().ok_or_else(|| {
+                    TransactionError::InvalidFormat("Missing receiver".to_string())
+                })?)?,
+                denom: vec_to_array::<32>(st.denom().ok_or_else(|| {
+                    TransactionError::InvalidFormat("Missing denom".to_string())
+                })?)?,
                 amount: st.amount(),
                 nonce: st.nonce(),
                 signature: vec_to_vec(
-                    st.signature().ok_or_else(|| TransactionError::InvalidFormat("Missing signature".to_string()))?,
-                    Some(64)
+                    st.signature().ok_or_else(|| {
+                        TransactionError::InvalidFormat("Missing signature".to_string())
+                    })?,
+                    Some(64),
                 )?,
-                gas_sponsorer: vec_to_array::<32>(
-                    st.gas_sponsorer().ok_or_else(|| TransactionError::InvalidFormat("Missing gas_sponsorer".to_string()))?
-                )?,
+                gas_sponsorer: vec_to_array::<32>(st.gas_sponsorer().ok_or_else(|| {
+                    TransactionError::InvalidFormat("Missing gas_sponsorer".to_string())
+                })?)?,
             })
         }
         TxBody::MintTx => {
-            let mt = tx.body_as_mint_tx()
+            let mt = tx
+                .body_as_mint_tx()
                 .ok_or_else(|| TransactionError::InvalidFormat("Invalid MintTx".to_string()))?;
-            
+
             Transaction::Mint(Mint {
-                sender: vec_to_array::<32>(
-                    mt.sender().ok_or_else(|| TransactionError::InvalidFormat("Missing sender".to_string()))?
-                )?,
+                sender: vec_to_array::<32>(mt.sender().ok_or_else(|| {
+                    TransactionError::InvalidFormat("Missing sender".to_string())
+                })?)?,
                 amount: mt.amount(),
-                denom: vec_to_array::<32>(
-                    mt.denom().ok_or_else(|| TransactionError::InvalidFormat("Missing denom".to_string()))?
-                )?,
+                denom: vec_to_array::<32>(mt.denom().ok_or_else(|| {
+                    TransactionError::InvalidFormat("Missing denom".to_string())
+                })?)?,
                 nonce: mt.nonce(),
                 signature: vec_to_vec(
-                    mt.signature().ok_or_else(|| TransactionError::InvalidFormat("Missing signature".to_string()))?,
-                    Some(64)
+                    mt.signature().ok_or_else(|| {
+                        TransactionError::InvalidFormat("Missing signature".to_string())
+                    })?,
+                    Some(64),
                 )?,
-                gas_sponsorer: vec_to_array::<32>(
-                    mt.gas_sponsorer().ok_or_else(|| TransactionError::InvalidFormat("Missing gas_sponsorer".to_string()))?
-                )?,
+                gas_sponsorer: vec_to_array::<32>(mt.gas_sponsorer().ok_or_else(|| {
+                    TransactionError::InvalidFormat("Missing gas_sponsorer".to_string())
+                })?)?,
             })
         }
         TxBody::StakeTx => {
-            let st = tx.body_as_stake_tx()
+            let st = tx
+                .body_as_stake_tx()
                 .ok_or_else(|| TransactionError::InvalidFormat("Invalid StakeTx".to_string()))?;
-            
+
             Transaction::Stake(Stake {
-                sender: vec_to_array::<32>(
-                    st.sender().ok_or_else(|| TransactionError::InvalidFormat("Missing sender".to_string()))?
-                )?,
-                delegation_receiver: vec_to_array::<32>(
-                    st.delegation_receiver().ok_or_else(|| TransactionError::InvalidFormat("Missing delegation_receiver".to_string()))?
-                )?,
+                sender: vec_to_array::<32>(st.sender().ok_or_else(|| {
+                    TransactionError::InvalidFormat("Missing sender".to_string())
+                })?)?,
+                delegation_receiver: vec_to_array::<32>(st.delegation_receiver().ok_or_else(
+                    || TransactionError::InvalidFormat("Missing delegation_receiver".to_string()),
+                )?)?,
                 amount: st.amount(),
                 nonce: st.nonce(),
                 signature: vec_to_vec(
-                    st.signature().ok_or_else(|| TransactionError::InvalidFormat("Missing signature".to_string()))?,
-                    Some(64)
+                    st.signature().ok_or_else(|| {
+                        TransactionError::InvalidFormat("Missing signature".to_string())
+                    })?,
+                    Some(64),
                 )?,
-                gas_sponsorer: vec_to_array::<32>(
-                    st.gas_sponsorer().ok_or_else(|| TransactionError::InvalidFormat("Missing gas_sponsorer".to_string()))?
-                )?,
+                gas_sponsorer: vec_to_array::<32>(st.gas_sponsorer().ok_or_else(|| {
+                    TransactionError::InvalidFormat("Missing gas_sponsorer".to_string())
+                })?)?,
             })
         }
         TxBody::SolveTx => {
-            let sv = tx.body_as_solve_tx()
+            let sv = tx
+                .body_as_solve_tx()
                 .ok_or_else(|| TransactionError::InvalidFormat("Invalid SolveTx".to_string()))?;
-            
+
             Transaction::Solve(Solve {
-                sender: vec_to_array::<32>(
-                    sv.sender().ok_or_else(|| TransactionError::InvalidFormat("Missing sender".to_string()))?
-                )?,
+                sender: vec_to_array::<32>(sv.sender().ok_or_else(|| {
+                    TransactionError::InvalidFormat("Missing sender".to_string())
+                })?)?,
                 proof: vec_to_vec(
-                    sv.proof().ok_or_else(|| TransactionError::InvalidFormat("Missing proof".to_string()))?,
-                    Some(256)
+                    sv.proof().ok_or_else(|| {
+                        TransactionError::InvalidFormat("Missing proof".to_string())
+                    })?,
+                    Some(256),
                 )?,
-                puzzle_id: vec_to_array::<32>(
-                    sv.puzzle_id().ok_or_else(|| TransactionError::InvalidFormat("Missing puzzle_id".to_string()))?
-                )?,
+                puzzle_id: vec_to_array::<32>(sv.puzzle_id().ok_or_else(|| {
+                    TransactionError::InvalidFormat("Missing puzzle_id".to_string())
+                })?)?,
                 nonce: sv.nonce(),
                 signature: vec_to_vec(
-                    sv.signature().ok_or_else(|| TransactionError::InvalidFormat("Missing signature".to_string()))?,
-                    Some(64)
+                    sv.signature().ok_or_else(|| {
+                        TransactionError::InvalidFormat("Missing signature".to_string())
+                    })?,
+                    Some(64),
                 )?,
-                gas_sponsorer: vec_to_array::<32>(
-                    sv.gas_sponsorer().ok_or_else(|| TransactionError::InvalidFormat("Missing gas_sponsorer".to_string()))?
-                )?,
+                gas_sponsorer: vec_to_array::<32>(sv.gas_sponsorer().ok_or_else(|| {
+                    TransactionError::InvalidFormat("Missing gas_sponsorer".to_string())
+                })?)?,
             })
         }
-        _ => return Err(TransactionError::InvalidFormat("Unknown transaction type".to_string())),
+        _ => {
+            return Err(TransactionError::InvalidFormat(
+                "Unknown transaction type".to_string(),
+            ))
+        }
     };
-    
+
     Ok(transaction)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::types::{EMPTY64BYTES, bytes64};
-    
+    use crate::types::{bytes64, EMPTY64BYTES};
+
     #[test]
     fn test_transaction_roundtrip() {
         let tx = Transaction::Send(Send {
@@ -261,10 +276,10 @@ mod tests {
             signature: bytes64(EMPTY64BYTES),
             gas_sponsorer: [5u8; 32],
         });
-        
+
         let fb_bytes = transaction_to_flatbuffer(&tx).unwrap();
         let decoded = flatbuffer_to_transaction(&fb_bytes).unwrap();
-        
+
         match (tx, decoded) {
             (Transaction::Send(a), Transaction::Send(b)) => {
                 assert_eq!(a.sender, b.sender);
