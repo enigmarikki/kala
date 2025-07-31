@@ -1,0 +1,67 @@
+[workspace]
+resolver = "2"
+members = [
+    "tick/tick",
+    "timelocks/timelocks",
+    "kala-core",
+    "kala-state",
+    "kala-rpc",
+    "kala-transaction",
+    "kala-vdf",
+]
+
+[workspace.package]
+version = "0.0.2"
+authors = ["Hrishi"]
+edition = "2021"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/enigmarikki/kala"
+
+[workspace.dependencies]
+# Internal crates
+tick = { path = "tick/tick" }
+timelocks = { path = "timelocks/timelocks" }
+kala-core = { path = "kala-core" }
+kala-state = { path = "kala-state" }
+kala-rpc = { path = "kala-rpc" }
+kala-transaction = { path = "kala-transaction" }
+kala-vdf = { path = "kala-vdf" }
+
+# External deps
+tokio = { version = "1.35", features = ["full"] }
+sha2 = "0.10"
+serde = { version = "1.0", features = ["derive"] }
+bincode = "2.0.1"
+anyhow = "1.0"
+tracing = "0.1"
+flatbuffers = "25.2.10"
+num-bigint = "0.4"
+num-traits = "0.2"
+rocksdb = "0.23"
+hex = "0.4"
+axum = "0.7"
+tower = "0.4"
+jsonrpsee = { version = "0.21", features = ["server", "macros"] }
+futures = "0.3"
+clap = { version = "4.0", features = ["derive"] }
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+cc = "1.0"
+bindgen = "0.69"
+async-trait = "0.1"
+thiserror = "1.0"
+aes-gcm = "0.10"
+rand = "0.8"
+rug = { version = "1.24", features = ["integer", "rand"] }
+
+# Additional dependencies needed by kala-core
+serde_json = "1.0"
+serde_yaml = "0.9"
+toml = "0.8"
+
+[profile.release]
+lto = true
+codegen-units = 1
+opt-level = 3
+
+[profile.bench]
+inherits = "release"

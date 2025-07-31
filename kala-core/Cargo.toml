@@ -1,0 +1,39 @@
+[package]
+name = "kala-core"
+version.workspace = true
+authors.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+# Workspace dependencies
+kala-vdf = { workspace = true }
+kala-state = { workspace = true }
+kala-transaction = { workspace = true }
+kala-rpc = { workspace = true }
+tokio = { workspace = true }
+anyhow = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+clap = { workspace = true }
+serde = { workspace = true }
+hex = { workspace = true }
+sha2 = { workspace = true }
+bincode = { workspace = true }
+futures = { workspace = true }
+async-trait = { workspace = true }
+jsonrpsee = { workspace = true }
+bindgen = {workspace = true}
+
+serde_json = { workspace = true }
+serde_yaml = { workspace = true }
+toml = { workspace = true }
+num-bigint = { workspace = true }
+
+[[bin]]
+name = "devnode"
+path = "bin/devnode.rs"
+
+
+[build-dependencies]
+bindgen = "0.72.0"

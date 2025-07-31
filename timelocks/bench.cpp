@@ -46,7 +46,7 @@ int main(int argc, char** argv) {
         {
             std::cout << "=== Batch solving (1000 puzzles) ===\n";
             
-            // Create batch of same puzzle (in real use, these would be different)
+            // Create batch of same puzzle for simplicity
             std::vector<rsw::PuzzleParams> batch(1000, params);
             
             auto start = std::chrono::high_resolution_clock::now();
@@ -89,8 +89,6 @@ int main(int argc, char** argv) {
                 }
                 std::cout << "\n";
                 
-                // You can pass result.key to your Rust AES-GCM decryption function
-                // rust_decrypt(result.key, iv, tag, ciphertext);
             }
         }
         

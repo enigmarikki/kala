@@ -1,0 +1,62 @@
+namespace tx;
+
+// Byte array types
+struct Bytes32  { data:[ubyte:32]; }
+struct Bytes64  { data:[ubyte:64]; }
+struct Bytes128 { data:[ubyte:128]; }
+struct Bytes256 { data:[ubyte:256]; }
+struct Nonce96 { data:[ubyte:12]; }   
+struct Tag128  { mac:[ubyte:16]; }
+
+// Transaction types
+table SendTx {
+  sender:[ubyte];
+  receiver:[ubyte];
+  denom:[ubyte];
+  amount:ulong;
+  nonce:ulong;
+  signature:[ubyte];
+  gas_sponsorer:[ubyte];
+}
+
+table MintTx {
+  sender:[ubyte];
+  amount:ulong;
+  denom:[ubyte];
+  nonce:ulong;
+  signature:[ubyte];
+  gas_sponsorer:[ubyte];
+}
+
+table StakeTx {
+  sender:[ubyte];
+  delegation_receiver:[ubyte];
+  amount:ulong;
+  nonce:ulong;
+  signature:[ubyte];
+  gas_sponsorer:[ubyte];
+}
+
+table SolveTx {
+  sender:[ubyte];
+  proof:[ubyte];
+  puzzle_id:[ubyte];
+  nonce:ulong;
+  signature:[ubyte];
+  gas_sponsorer:[ubyte];
+}
+union TxBody { SendTx, MintTx, StakeTx, SolveTx }
+
+// Main transaction table
+table Transaction {
+  body:TxBody;
+}
+
+// Sealed transaction for timelock
+table SealedTx {
+  nonce:[ubyte];
+  tag:[ubyte];
+  ciphertext:[ubyte];
+}
+
+root_type Transaction;
