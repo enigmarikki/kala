@@ -26,7 +26,7 @@ Kala is a high-performance, VDF-based blockchain architecture designed for trust
 * MEV-resistant transaction ordering via timelock encryption
 * Graceful degradation under partial consensus failures
 
-For full technical details, see the [project whitepaper](https://github.com/enigmarikki/kala/blob/master/docs/whitepaper.pdf).
+For full technical details, see the [project whitepaper](https://github.com/enigmarikki/kala/blob/master/docs/kala_v0.0.2.pdf).
 
 ---
 
