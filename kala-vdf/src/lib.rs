@@ -49,7 +49,7 @@ pub struct TickCertificate {
     pub form_c: String,
     pub hash_chain: [u8; 32],              // h_(i+1)k
     pub data_merkle_root: [u8; 32],        // Root of all data in this tick
-    pub wesolowski_proof: Option<Vec<u8>>, // π for efficient verification
+    pub wesolowski_proof: Option<Vec<u8>>, // π for efficient verification ommited for brevity for now need to efficiently generate wesolowski's 
 }
 
 /// The eternal VDF computation state
