@@ -92,7 +92,7 @@ $(BIN_DIR)/bench: bench.cpp $(LIB_DIR)/librsw_solver.a
 	@echo "Built example: $@"
 
 # Build C API wrapper
-$(BUILD_DIR)/rsw_solver_c_api.o: rsw_solver_c_api.cpp rsw_solver.h $(BUILD_DIR)/rsw_solver.o
+$(BUILD_DIR)/rsw_solver_c_api.o: solver_api.cpp rsw_solver.h $(BUILD_DIR)/rsw_solver.o
 	$(CXX) $(CXXFLAGS) -c $< -o $@
 	@echo "Built C API wrapper"
 

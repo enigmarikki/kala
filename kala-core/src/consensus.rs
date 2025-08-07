@@ -14,17 +14,15 @@ use kala_vdf::EternalVDF;
 
 pub struct TickProcessor {
     iterations_per_tick: u64,
-    tick_duration_ms: u64,
     encryption_ctx: Arc<EncryptionContext>,
 }
 
 impl TickProcessor {
-    pub fn new(iterations_per_tick: u64, tick_duration_ms: u64) -> Self {
+    pub fn new(iterations_per_tick: u64) -> Self {
         let encryption_ctx = Arc::new(EncryptionContext::new(iterations_per_tick));
 
         Self {
             iterations_per_tick,
-            tick_duration_ms,
             encryption_ctx,
         }
     }
