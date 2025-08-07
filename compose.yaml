@@ -1,0 +1,17 @@
+version: '3.8'
+
+services:
+  kala:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: kala:latest
+    container_name: kala-node
+    volumes:
+      - ./kala_dev_db:/data
+      - ./config:/config:ro
+    environment:
+      - RUST_LOG=info
+    ports:
+      - "8545:8545"
+    restart: unless-stopped

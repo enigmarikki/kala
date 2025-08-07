@@ -49,11 +49,11 @@ async fn main() -> Result<()> {
     println!(
         r#"
 ╔═══════════════════════════════════════════════════════════════╗
-║      _  __     _          ____                               ║
-║     | |/ /    | |        |  _ \  _____   __                  ║
-║     | ' / __ _| | __ _   | | | |/ _ \ \ / /                  ║
-║     |  < / _` | |/ _` |  | |_| |  __/\ V /                   ║
-║     | . \ (_| | | (_| |  |____/ \___| \_/                    ║
+║      _  __     _          ____                                ║
+║     | |/ /    | |        |  _ \  _____   __                   ║
+║     | ' / __ _| | __ _   | | | |/ _ \ \ / /                   ║
+║     |  < / _` | |/ _` |  | |_| |  __/\ V /                    ║
+║     | . \ (_| | | (_| |  |____/ \___| \_/                     ║
 ║     |_|\_\__,_|_|\__,_|                                       ║
 ║                                                               ║
 ║     The Immutability of Time - Development Node               ║
@@ -67,7 +67,6 @@ async fn main() -> Result<()> {
         NodeConfig {
             db_path: args.db_path,
             rpc_port: args.rpc_port,
-            tick_duration_ms: 1000,
             iterations_per_tick: 1024,
             timelock_hardness_factor: 0.05,
             enable_gpu: false,
@@ -82,7 +81,6 @@ async fn main() -> Result<()> {
         NodeConfig {
             db_path: args.db_path,
             rpc_port: args.rpc_port,
-            tick_duration_ms,
             iterations_per_tick: args.iterations_per_tick,
             timelock_hardness_factor: 0.1,
             enable_gpu: false,
@@ -102,7 +100,6 @@ async fn main() -> Result<()> {
     tracing::info!("  Database: {}", config.db_path);
     tracing::info!("  RPC port: {}", config.rpc_port);
     tracing::info!("  Iterations per tick: {}", config.iterations_per_tick);
-    tracing::info!("  Tick duration: {}ms", config.tick_duration_ms);
     tracing::info!(
         "  Timelock hardness: {}%",
         config.timelock_hardness_factor * 100.0

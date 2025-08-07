@@ -13,9 +13,6 @@ pub struct NodeConfig {
     /// Number of VDF iterations per tick (k)
     pub iterations_per_tick: u64,
 
-    /// Target duration for each tick in milliseconds
-    pub tick_duration_ms: u64,
-
     /// Timelock hardness factor (0.0 to 1.0)
     /// Determines RSW puzzle difficulty as fraction of tick
     pub timelock_hardness_factor: f64,
@@ -45,7 +42,6 @@ impl Default for NodeConfig {
             db_path: "./kala_db".to_string(),
             rpc_port: 8545,
             iterations_per_tick: 65536, // 2^16 as per paper
-            tick_duration_ms: 497,       // ~497.7ms as measured in paper
             timelock_hardness_factor: 0.1,
             enable_gpu: true,
             max_transactions_per_tick: 10000,
@@ -63,10 +59,6 @@ impl NodeConfig {
     pub fn validate(&self) -> Result<(), Box<dyn std::error::Error>> {
         if self.iterations_per_tick == 0 {
             return Err("iterations_per_tick must be greater than 0".into());
-        }
-
-        if self.tick_duration_ms == 0 {
-            return Err("tick_duration_ms must be greater than 0".into());
         }
 
         if self.timelock_hardness_factor < 0.0 || self.timelock_hardness_factor > 1.0 {

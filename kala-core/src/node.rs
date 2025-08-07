@@ -55,17 +55,13 @@ impl KalaNode {
         };
 
         // Create tick processor with proper parameters
-        let tick_processor = Arc::new(TickProcessor::new(
-            config.iterations_per_tick,
-            config.tick_duration_ms,
-        ));
+        let tick_processor = Arc::new(TickProcessor::new(config.iterations_per_tick));
 
         info!("Initialized Kala node - The Eternal Timeline");
         info!(
             "  - Iterations per tick (k): {}",
             config.iterations_per_tick
         );
-        info!("  - Tick duration: {}ms", config.tick_duration_ms);
         info!("  - Current tick: {}", chain_state.current_tick);
         info!(
             "  - VDF iteration: {}",
@@ -276,24 +272,45 @@ impl KalaNode {
                     drop(state);
 
                     let elapsed = tick_start.elapsed();
-                    info!("┌─────────────────────────────────────────┐");
-                    info!("│      Tick {} Complete!               │", current_tick);
-                    info!(
-                        "│  Type: {:?}                          │",
-                        certificate.tick_type
-                    );
-                    info!(
-                        "│  Transactions: {:04}                  │",
-                        certificate.transaction_count
-                    );
-                    info!("│  Duration: {:?}                      │", elapsed);
-                    info!("│  VDF: {} → {}              │", vdf_start, vdf_end);
-                    info!(
-                        "│  Hash: {}...           │",
-                        hex::encode(&certificate.tick_hash[..8])
-                    );
-                    info!("└─────────────────────────────────────────┘");
 
+                    // Format all values first to get consistent widths
+                    let tick_str = format!("Tick {} Complete!", current_tick);
+                    let type_str = format!("Type: {:?}", certificate.tick_type);
+                    let tx_str = format!("Transactions: {:04}", certificate.transaction_count);
+                    let duration_str = format!("Duration: {:.2}ms", elapsed.as_secs_f64() * 1000.0);
+                    let vdf_str = format!("VDF: {} → {}", vdf_start, vdf_end);
+                    let hash_str = format!("Hash: {}...", hex::encode(&certificate.tick_hash[..8]));
+
+                    // Calculate the box width based on the longest line
+                    let box_width = [
+                        tick_str.len(),
+                        type_str.len(),
+                        tx_str.len(),
+                        duration_str.len(),
+                        vdf_str.len(),
+                        hash_str.len(),
+                    ]
+                    .iter()
+                    .max()
+                    .unwrap()
+                    .max(&40)
+                        + 4; // Add padding and ensure minimum width
+
+                    // Helper function to pad strings
+                    let pad = |s: &str| format!("│  {:<width$}  │", s, width = box_width - 6);
+
+                    // Create the box
+                    let top_line = format!("┌{}┐", "─".repeat(box_width - 2));
+                    let bottom_line = format!("└{}┘", "─".repeat(box_width - 2));
+
+                    info!("{}", top_line);
+                    info!("{}", pad(&tick_str));
+                    info!("{}", pad(&type_str));
+                    info!("{}", pad(&tx_str));
+                    info!("{}", pad(&duration_str));
+                    info!("{}", pad(&vdf_str));
+                    info!("{}", pad(&hash_str));
+                    info!("{}", bottom_line);
                     // Log VDF checkpoint periodically
                     if current_tick % 10 == 0 {
                         self.log_vdf_checkpoint().await;
@@ -306,16 +323,15 @@ impl KalaNode {
                 }
             }
 
-            // Maintain tick timing
+            // Maintain tick timing : These are perf metrics DONOT use in prod
             let elapsed = tick_start.elapsed();
-            if elapsed < Duration::from_millis(self.config.tick_duration_ms) {
-                let sleep_duration = Duration::from_millis(self.config.tick_duration_ms) - elapsed;
-                tokio::time::sleep(sleep_duration).await;
+            if elapsed < Duration::from_millis(500) {
+                let sleep_duration = Duration::from_millis(500) - elapsed;
             } else {
                 warn!(
                     "Tick {} overran by {:?}",
                     current_tick,
-                    elapsed - Duration::from_millis(self.config.tick_duration_ms)
+                    elapsed - Duration::from_millis(500)
                 );
             }
         }
@@ -386,27 +402,55 @@ impl KalaNode {
     async fn log_vdf_checkpoint(&self) {
         let vdf = self.vdf.read().await;
         let checkpoint = vdf.checkpoint();
-        info!("┌─────────────────────────────────────────┐");
-        info!("│           VDF Checkpoint                │");
-        info!(
-            "│  Iteration: {:012}                │",
-            checkpoint.iteration
-        );
-        info!(
-            "│  Forms: ({}, {}, {})                   │",
+
+        // Format all values first
+        let title = "VDF Checkpoint";
+        let iteration_str = format!("Iteration: {}", checkpoint.iteration);
+        let forms_str = format!(
+            "Forms: ({}, {}, {})",
             preview(&checkpoint.form_a, 8),
             preview(&checkpoint.form_b, 8),
             preview(&checkpoint.form_c, 8)
         );
-        info!(
-            "│  Hash: {}...           │",
-            hex::encode(&checkpoint.hash_chain[..8])
-        );
-        info!(
-            "│  Tick Certs: {}                      │",
-            checkpoint.tick_certificates.len()
-        );
-        info!("└─────────────────────────────────────────┘");
+        let hash_str = format!("Hash: {}...", hex::encode(&checkpoint.hash_chain[..8]));
+        let certs_str = format!("Tick Certs: {}", checkpoint.tick_certificates.len());
+
+        // Calculate the box width based on the longest line
+        let box_width = [
+            title.len(),
+            iteration_str.len(),
+            forms_str.len(),
+            hash_str.len(),
+            certs_str.len(),
+        ]
+        .iter()
+        .max()
+        .unwrap()
+        .max(&40)
+            + 4; // Add padding and ensure minimum width
+
+        // Helper function to pad strings (left-aligned)
+        let pad = |s: &str| format!("│  {:<width$}  │", s, width = box_width - 6);
+
+        // Helper function to center text
+        let center = |s: &str| {
+            let padding = (box_width - 4 - s.len()) / 2;
+            let left_pad = " ".repeat(padding);
+            let right_pad = " ".repeat(box_width - 4 - padding - s.len());
+            format!("│  {}{}{}  │", left_pad, s, right_pad)
+        };
+
+        // Create the box
+        let top_line = format!("┌{}┐", "─".repeat(box_width - 2));
+        let bottom_line = format!("└{}┘", "─".repeat(box_width - 2));
+
+        info!("{}", top_line);
+        info!("{}", center(&title));
+        info!("{}", pad(&iteration_str));
+        info!("{}", pad(&forms_str));
+        info!("{}", pad(&hash_str));
+        info!("{}", pad(&certs_str));
+        info!("{}", bottom_line);
     }
 }
 fn preview(s: &str, n: usize) -> &str {
