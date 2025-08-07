@@ -61,11 +61,12 @@ WORKDIR /app/timelocks
 RUN ls -la CGBN/ || echo "CGBN directory missing"
 
 WORKDIR /app
+# The build.rs will handle linking the native libraries
 RUN cargo build --release --bin devnode
 RUN strip target/release/devnode
 
-# Stage 2: Runtime
-FROM ubuntu:22.04
+# Stage 2: Runtime - use CUDA runtime image instead of plain Ubuntu
+FROM nvidia/cuda:12.2.0-runtime-ubuntu22.04
 
 # Install minimal runtime dependencies
 RUN apt-get update && apt-get install -y \
@@ -79,24 +80,14 @@ RUN apt-get update && apt-get install -y \
 # Create non-root user
 RUN useradd -r -s /bin/false -d /data kala
 
-# Copy the binary and required libraries
+# Copy only the binary (statically linked with the native libs via build.rs)
 COPY --from=builder /app/target/release/devnode /usr/local/bin/devnode
 
-# Copy native libraries (both static libs and object files if needed)
-COPY --from=builder /app/tick/src/libtick.a /usr/local/lib/ 2>/dev/null || true
-COPY --from=builder /app/timelocks/lib/librsw_solver.a /usr/local/lib/
-COPY --from=builder /app/timelocks/build/rsw_solver.o /usr/local/lib/ 2>/dev/null || true
-
-# Set runtime environment (no CUDA runtime needed)
-ENV LD_LIBRARY_PATH="/usr/local/lib:${LD_LIBRARY_PATH}"
-
 # Create data directory
-RUN mkdir -p /data
+RUN mkdir -p /data && \
+    chmod 755 /data
 
 WORKDIR /data
 
-# Add some debugging
-RUN echo "Binary location:" && ls -la /usr/local/bin/devnode
-RUN echo "Data directory:" && ls -la /data
 
 ENTRYPOINT ["devnode"]
