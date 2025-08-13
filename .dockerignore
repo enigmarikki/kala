@@ -1,0 +1,9 @@
+kala_dev_db
+target
+.git
+*.md
+docs
+tick/src/*.o
+tick/src/*.s
+timelocks/build
+timelocks/bin

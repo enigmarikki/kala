@@ -35,6 +35,9 @@
 #![warn(missing_docs)]
 #![warn(rustdoc::missing_crate_level_docs)]
 
+// Import kala-common for shared functionality
+use kala_common;
+
 /// Configuration module
 pub mod config;
 
@@ -44,11 +47,15 @@ pub mod consensus;
 /// Node implementation
 pub mod node;
 
+// Serialization and networking now provided by kala-common
+
 /// Prelude with commonly used types
 pub mod prelude {
     pub use crate::config::NodeConfig;
     pub use crate::consensus::TickProcessor;
     pub use crate::node::KalaNode;
+    // Re-export kala-common prelude
+    pub use kala_common::prelude::*;
 }
 
 // Re-export main types at crate root
@@ -59,14 +66,8 @@ pub use node::KalaNode;
 /// Kala version
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 
-/// Default network discriminant (from the paper)
-pub const DEFAULT_DISCRIMINANT: &str = "-141140317794792668862943332656856519378482291428727287413318722089216448567155737094768903643716404517549715385664163360316296284155310058980984373770517398492951860161717960368874227473669336541818575166839209228684755811071416376384551902149780184532086881683576071479646499601330824259260645952517205526679";
-
-/// Default iterations per tick (k = 2^16)
-pub const DEFAULT_ITERATIONS_PER_TICK: u64 = 65536;
-
-/// Default tick duration in milliseconds (~497.7ms as measured) this field is redundant
-pub const DEFAULT_TICK_DURATION_MS: u64 = 497;
+// Constants now provided by kala-common
+pub use kala_common::types::consensus::{DEFAULT_DISCRIMINANT, DEFAULT_ITERATIONS_PER_TICK, DEFAULT_TICK_DURATION_MS};
 
 #[cfg(test)]
 mod tests {

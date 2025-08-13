@@ -1,39 +1,70 @@
+# Kala Core - The Heart of the Eternal Timeline
+#
+# This crate provides the main blockchain node implementation for Kala,
+# a VDF-based blockchain designed for trustless timestamping and MEV resistance.
+#
+# Components:
+# - KalaNode: Main node orchestrating the eternal VDF computation
+# - TickProcessor: Consensus engine handling the 4-phase tick processing
+# - NodeConfig: Configuration management with validation
+# - DevNode binary: Development node for testing and experimentation
+
 [package]
 name = "kala-core"
 version.workspace = true
 authors.workspace = true
 edition.workspace = true
 license.workspace = true
+description = "Core blockchain node implementation for Kala VDF-based consensus"
+keywords = ["blockchain", "vdf", "consensus", "timelock", "mev"]
+categories = ["cryptography", "network-programming"]
+repository.workspace = true
 
 [dependencies]
-# Workspace dependencies
-kala-vdf = { workspace = true }
-kala-state = { workspace = true }
-kala-transaction = { workspace = true }
-kala-rpc = { workspace = true }
-tokio = { workspace = true }
-anyhow = { workspace = true }
-tracing = { workspace = true }
-tracing-subscriber = { workspace = true }
-clap = { workspace = true }
-serde = { workspace = true }
-hex = { workspace = true }
-sha2 = { workspace = true }
-bincode = { workspace = true }
-futures = { workspace = true }
-async-trait = { workspace = true }
-jsonrpsee = { workspace = true }
-bindgen = {workspace = true}
+# Internal Kala crates - the modular architecture
+kala-common = { workspace = true }                         # Shared utilities and types
+kala-vdf = { workspace = true }                            # VDF implementations
+kala-state = { workspace = true }                          # State management
+kala-transaction = { workspace = true }                    # Transaction processing
+kala-rpc = { workspace = true }                            # JSON-RPC API server
 
-serde_json = { workspace = true }
-serde_yaml = { workspace = true }
-toml = { workspace = true }
-num-bigint = { workspace = true }
+# Core async runtime and utilities
+tokio = { workspace = true }                               # Async runtime for concurrent operations
+futures = { workspace = true }                             # Future combinators
+async-trait = { workspace = true }                         # Async trait support
 
+# Error handling and logging
+anyhow = { workspace = true }                              # Flexible error handling
+tracing = { workspace = true }                             # Structured logging
+tracing-subscriber = { workspace = true }                 # Log subscriber implementations
+
+# CLI and configuration
+clap = { workspace = true }                                # Command line parsing for devnode
+serde = { workspace = true }                               # Serialization framework
+serde_json = { workspace = true }                          # JSON serialization
+serde_yaml = { workspace = true }                          # YAML config files
+toml = { workspace = true }                                # TOML config files
+
+# Cryptography and serialization
+sha2 = { workspace = true }                                # SHA-2 hash functions
+hex = { workspace = true }                                 # Hex encoding utilities
+bincode = { workspace = true }                             # Binary serialization
+
+# Mathematics for VDF operations
+num-bigint = { workspace = true }                          # Arbitrary precision integers
+
+# RPC and networking
+jsonrpsee = { workspace = true }                           # JSON-RPC implementation
+
+# Build dependencies
+bindgen = { workspace = true }                             # C++ bindings generation
+
+# Development node binary - for testing and experimentation
+# Usage: cargo run -p kala-core --bin devnode -- --help
 [[bin]]
 name = "devnode"
 path = "bin/devnode.rs"
 
-
+# Build-time dependencies for C++ integration
 [build-dependencies]
-bindgen = "0.72.0"
+bindgen = "0.72.0"                                         # Generate Rust bindings for C++ VDF code

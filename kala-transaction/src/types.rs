@@ -1,33 +1,14 @@
-use serde::{Deserialize, Serialize};
-use thiserror::Error;
+use kala_common::prelude::*;
+use kala_common::types::{Hash, PublicKey, Signature};
 
-#[derive(Error, Debug)]
-pub enum TransactionError {
-    #[error("Invalid byte array size: expected {expected}, got {actual}")]
-    InvalidSize { expected: usize, actual: usize },
-
-    #[error("Serialization error: {0}")]
-    SerializationError(String),
-
-    #[error("Encryption error: {0}")]
-    EncryptionError(String),
-
-    #[error("Decryption error: {0}")]
-    DecryptionError(String),
-
-    #[error("Invalid transaction format: {0}")]
-    InvalidFormat(String),
-
-    #[error("Flatbuffer error: {0}")]
-    FlatbufferError(String),
-}
-
-pub type Result<T> = std::result::Result<T, TransactionError>;
+// Use KalaError from kala-common instead of local TransactionError
 
 pub use crate::generated::tx::{Bytes128, Bytes32, Nonce96, Tag128};
 
-// Helper type aliases
-pub type Bytes32Array = [u8; 32];
+// Helper type aliases using kala-common types
+pub type Bytes32Array = Hash;  // Use Hash from kala-common
+pub type PublicKeyArray = PublicKey;  // Use PublicKey from kala-common
+pub type SignatureArray = Signature;  // Use Signature from kala-common
 pub type Nonce96Array = [u8; 12];
 pub type Tag128Array = [u8; 16];
 
@@ -86,32 +67,32 @@ pub struct Solve {
     pub gas_sponsorer: Bytes32Array,
 }
 
-// Add validation methods
+// Add validation methods using kala-common
 impl Send {
-    pub fn validate(&self) -> Result<()> {
+    pub fn validate(&self) -> KalaResult<()> {
         if self.signature.len() != 64 {
-            return Err(TransactionError::InvalidSize {
-                expected: 64,
-                actual: self.signature.len(),
-            });
+            return Err(KalaError::validation(format!(
+                "Invalid signature size: expected 64, got {}", 
+                self.signature.len()
+            )));
         }
         Ok(())
     }
 }
 
 impl Solve {
-    pub fn validate(&self) -> Result<()> {
+    pub fn validate(&self) -> KalaResult<()> {
         if self.signature.len() != 64 {
-            return Err(TransactionError::InvalidSize {
-                expected: 64,
-                actual: self.signature.len(),
-            });
+            return Err(KalaError::validation(format!(
+                "Invalid signature size: expected 64, got {}", 
+                self.signature.len()
+            )));
         }
         if self.proof.len() != 256 {
-            return Err(TransactionError::InvalidSize {
-                expected: 256,
-                actual: self.proof.len(),
-            });
+            return Err(KalaError::validation(format!(
+                "Invalid proof size: expected 256, got {}", 
+                self.proof.len()
+            )));
         }
         Ok(())
     }
@@ -126,12 +107,12 @@ pub enum Transaction {
     Solve(Solve),
 }
 
-// Metadata for timestamping
+// Metadata for timestamping using kala-common types
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct TransactionMetadata {
-    pub timestamp: u64,
-    pub tick: u64,
-    pub iteration: u64,
+    pub timestamp: Timestamp,
+    pub tick: BlockHeight,
+    pub iteration: IterationNumber,
 }
 
 // Encrypted transaction wrapper
@@ -147,8 +128,8 @@ pub struct SealedTransaction {
 pub struct TimelockTransaction {
     pub encrypted_data: SealedTransaction,
     pub puzzle: RSWPuzzle,
-    pub submission_iteration: u64,
-    pub target_tick: u64,
+    pub submission_iteration: IterationNumber,
+    pub target_tick: BlockHeight,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -159,8 +140,61 @@ pub struct RSWPuzzle {
     pub hardness: u32,
 }
 
-// Constants
-pub const AES_KEY_SIZE: usize = 32;
-pub const TAG_SIZE: usize = 16;
-pub const NONCE_SIZE: usize = 12;
+// Use constants from kala-common instead of duplicating
+pub use kala_common::types::sizes::{AES_KEY_SIZE, TAG_SIZE, NONCE_SIZE};
 pub const EMPTY64BYTES: [u8; 64] = [0u8; 64];
+
+// Implement KalaSerialize for all transaction types
+impl KalaSerialize for Send {
+    fn preferred_encoding() -> EncodingType {
+        EncodingType::FlatBuffers // Efficient for frequent serialization
+    }
+}
+
+impl KalaSerialize for Mint {
+    fn preferred_encoding() -> EncodingType {
+        EncodingType::FlatBuffers
+    }
+}
+
+impl KalaSerialize for Stake {
+    fn preferred_encoding() -> EncodingType {
+        EncodingType::FlatBuffers
+    }
+}
+
+impl KalaSerialize for Solve {
+    fn preferred_encoding() -> EncodingType {
+        EncodingType::FlatBuffers
+    }
+}
+
+impl KalaSerialize for Transaction {
+    fn preferred_encoding() -> EncodingType {
+        EncodingType::FlatBuffers
+    }
+}
+
+impl KalaSerialize for TransactionMetadata {
+    fn preferred_encoding() -> EncodingType {
+        EncodingType::Bincode // Compact for metadata
+    }
+}
+
+impl KalaSerialize for SealedTransaction {
+    fn preferred_encoding() -> EncodingType {
+        EncodingType::Bincode // Compact for encrypted data
+    }
+}
+
+impl KalaSerialize for TimelockTransaction {
+    fn preferred_encoding() -> EncodingType {
+        EncodingType::Bincode // Compact for network transmission
+    }
+}
+
+impl KalaSerialize for RSWPuzzle {
+    fn preferred_encoding() -> EncodingType {
+        EncodingType::Bincode // Compact for puzzle data
+    }
+}

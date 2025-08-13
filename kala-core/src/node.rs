@@ -1,7 +1,6 @@
 use anyhow::Result;
 use sha2::{Digest, Sha256};
 use std::sync::Arc;
-use std::time::{Duration, Instant};
 use tokio::sync::{mpsc, Mutex, RwLock};
 use tracing::{debug, error, info, warn};
 
@@ -41,12 +40,12 @@ pub struct KalaNode {
 }
 
 impl KalaNode {
-    pub fn new(config: NodeConfig) -> Result<Self> {
+    pub async fn new(config: NodeConfig) -> Result<Self> {
         // Open state database
         let state_db = Arc::new(StateDB::open(&config.db_path)?);
 
         // Load chain state
-        let chain_state = state_db.load_chain_state()?;
+        let chain_state = state_db.load_chain_state().await?;
 
         // Initialize or restore VDF from checkpoint
         let vdf = match EternalVDF::from_checkpoint(&chain_state.vdf_checkpoint) {
@@ -224,7 +223,6 @@ impl KalaNode {
 
         // Main eternal loop
         loop {
-            let tick_start = Instant::now();
             let current_tick = self.state.read().await.current_tick;
 
             info!("┌─────────────────────────────────────────┐");
@@ -253,7 +251,7 @@ impl KalaNode {
             match self.process_eternal_tick(current_tick).await {
                 Ok(certificate) => {
                     // Store certificate in database
-                    self.state_db.store_tick(&certificate)?;
+                    self.state_db.store_tick(&certificate).await?;
 
                     // Update chain state
                     let mut state = self.state.write().await;
@@ -268,16 +266,13 @@ impl KalaNode {
                     drop(vdf);
 
                     // Persist state to database
-                    self.state_db.save_chain_state(&state)?;
+                    self.state_db.save_chain_state(&state).await?;
                     drop(state);
-
-                    let elapsed = tick_start.elapsed();
 
                     // Format all values first to get consistent widths
                     let tick_str = format!("Tick {} Complete!", current_tick);
                     let type_str = format!("Type: {:?}", certificate.tick_type);
                     let tx_str = format!("Transactions: {:04}", certificate.transaction_count);
-                    let duration_str = format!("Duration: {:.2}ms", elapsed.as_secs_f64() * 1000.0);
                     let vdf_str = format!("VDF: {} → {}", vdf_start, vdf_end);
                     let hash_str = format!("Hash: {}...", hex::encode(&certificate.tick_hash[..8]));
 
@@ -286,7 +281,6 @@ impl KalaNode {
                         tick_str.len(),
                         type_str.len(),
                         tx_str.len(),
-                        duration_str.len(),
                         vdf_str.len(),
                         hash_str.len(),
                     ]
@@ -307,7 +301,6 @@ impl KalaNode {
                     info!("{}", pad(&tick_str));
                     info!("{}", pad(&type_str));
                     info!("{}", pad(&tx_str));
-                    info!("{}", pad(&duration_str));
                     info!("{}", pad(&vdf_str));
                     info!("{}", pad(&hash_str));
                     info!("{}", bottom_line);
@@ -323,17 +316,7 @@ impl KalaNode {
                 }
             }
 
-            // Maintain tick timing : These are perf metrics DONOT use in prod
-            let elapsed = tick_start.elapsed();
-            if elapsed < Duration::from_millis(500) {
-                let sleep_duration = Duration::from_millis(500) - elapsed;
-            } else {
-                warn!(
-                    "Tick {} overran by {:?}",
-                    current_tick,
-                    elapsed - Duration::from_millis(500)
-                );
-            }
+            // VDF runs at maximum speed - no artificial delays
         }
     }
 
@@ -534,28 +517,28 @@ impl KalaApiServer for KalaRpcHandler {
         &self,
         req: GetTickRequest,
     ) -> jsonrpsee::core::RpcResult<Option<TickCertificate>> {
-        self.state_db.get_tick(req.tick_number).map_err(|e| {
-            jsonrpsee::types::error::ErrorObject::owned(
+        match self.state_db.get_tick(req.tick_number).await {
+            Ok(result) => Ok(result),
+            Err(e) => Err(jsonrpsee::types::error::ErrorObject::owned(
                 jsonrpsee::types::error::INTERNAL_ERROR_CODE,
                 e.to_string(),
                 None::<()>,
-            )
-            .into()
-        })
+            ).into())
+        }
     }
 
     async fn get_recent_ticks(
         &self,
         count: usize,
     ) -> jsonrpsee::core::RpcResult<Vec<TickCertificate>> {
-        self.state_db.get_recent_ticks(count).map_err(|e| {
-            jsonrpsee::types::error::ErrorObject::owned(
+        match self.state_db.get_recent_ticks(count).await {
+            Ok(result) => Ok(result),
+            Err(e) => Err(jsonrpsee::types::error::ErrorObject::owned(
                 jsonrpsee::types::error::INTERNAL_ERROR_CODE,
                 e.to_string(),
                 None::<()>,
-            )
-            .into()
-        })
+            ).into())
+        }
     }
 
     async fn get_account(
@@ -583,13 +566,14 @@ impl KalaApiServer for KalaRpcHandler {
         address.copy_from_slice(&address_bytes);
 
         // Load current state from DB
-        let state = self.state_db.load_chain_state().map_err(|e| {
-            jsonrpsee::types::error::ErrorObject::owned(
+        let state = match self.state_db.load_chain_state().await {
+            Ok(state) => state,
+            Err(e) => return Err(jsonrpsee::types::error::ErrorObject::owned(
                 jsonrpsee::types::error::INTERNAL_ERROR_CODE,
                 e.to_string(),
                 None::<()>,
-            )
-        })?;
+            ).into())
+        };
 
         Ok(state.get_account(&address).map(|account| AccountInfo {
             balance: account.balance,

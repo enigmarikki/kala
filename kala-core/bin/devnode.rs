@@ -75,9 +75,6 @@ async fn main() -> Result<()> {
             ..Default::default()
         }
     } else {
-        // Calculate tick duration based on iterations (7.6μs per iteration as per paper)
-        let tick_duration_ms = (args.iterations_per_tick as f64 * 7.6 / 1000.0) as u64;
-
         NodeConfig {
             db_path: args.db_path,
             rpc_port: args.rpc_port,
@@ -107,7 +104,7 @@ async fn main() -> Result<()> {
     tracing::info!("");
 
     // Create and run node
-    let node = Arc::new(KalaNode::new(config)?);
+    let node = Arc::new(KalaNode::new(config).await?);
 
     // Set up shutdown handler
     let shutdown_node = node.clone();
