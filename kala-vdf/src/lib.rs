@@ -191,15 +191,15 @@ impl EternalVDF {
 
         self.hash_chain = hasher.finalize().into();
 
-        // Check if we completed a tick
-        if self.iteration % self.tick_size == 0 {
+        // Check if we completed a tick (finalize after k iterations, not at boundary)
+        if self.iteration > 0 && self.iteration % self.tick_size == 0 {
             self.finalize_tick();
         }
     }
 
     /// Finalize a tick and create certificate
     fn finalize_tick(&self) {
-        let tick_number = self.iteration / self.tick_size - 1;
+        let tick_number = (self.iteration - 1) / self.tick_size;
         let start_iter = tick_number * self.tick_size;
         let end_iter = self.iteration;
 

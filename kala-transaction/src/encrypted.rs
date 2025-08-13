@@ -1,9 +1,10 @@
 // encrypted.rs - Encryption module for kala-transaction
 
 use crate::types::{
-    Nonce96Array, RSWPuzzle, Result, SealedTransaction, Tag128Array, TimelockTransaction,
-    Transaction, TransactionError, AES_KEY_SIZE, TAG_SIZE,
+    Nonce96Array, RSWPuzzle, SealedTransaction, Tag128Array, TimelockTransaction,
+    Transaction, AES_KEY_SIZE, TAG_SIZE,
 };
+use kala_common::prelude::{KalaResult, KalaError};
 use aes_gcm::{
     aead::{Aead, AeadCore, KeyInit, OsRng},
     Aes256Gcm, Key, Nonce,
@@ -44,7 +45,7 @@ impl EncryptionContext {
 pub fn encrypt_transaction(
     tx: &Transaction,
     key: &[u8; AES_KEY_SIZE],
-) -> Result<SealedTransaction> {
+) -> KalaResult<SealedTransaction> {
     // Convert to FlatBuffer for canonical serialization
     let plaintext = crate::decrypted::transaction_to_flatbuffer(tx)?;
 
@@ -57,20 +58,20 @@ pub fn encrypt_transaction(
     let nonce_array: Nonce96Array = nonce_bytes
         .as_slice()
         .try_into()
-        .map_err(|_| TransactionError::EncryptionError("Invalid nonce size".to_string()))?;
+        .map_err(|_| KalaError::crypto("Invalid nonce size".to_string()))?;
 
     // Encrypt with authenticated encryption
     let ciphertext = cipher
         .encrypt(&nonce_bytes, plaintext.as_ref())
         .map_err(|e| {
-            TransactionError::EncryptionError(format!("AES-GCM encryption failed: {e}"))
+            KalaError::crypto(format!("AES-GCM encryption failed: {e}"))
         })?;
 
     // Extract tag from the end of ciphertext (last 16 bytes)
     let (encrypted_data, tag_bytes) = ciphertext.split_at(ciphertext.len() - TAG_SIZE);
     let tag: Tag128Array = tag_bytes
         .try_into()
-        .map_err(|_| TransactionError::EncryptionError("Invalid tag size".to_string()))?;
+        .map_err(|_| KalaError::crypto("Invalid tag size".to_string()))?;
 
     Ok(SealedTransaction {
         nonce: nonce_array,
@@ -83,7 +84,7 @@ pub fn encrypt_transaction(
 pub fn decrypt_transaction(
     sealed: &SealedTransaction,
     key: &[u8; AES_KEY_SIZE],
-) -> Result<Transaction> {
+) -> KalaResult<Transaction> {
     // Create cipher
     let key = Key::<Aes256Gcm>::from_slice(key);
     let cipher = Aes256Gcm::new(key);
@@ -99,7 +100,7 @@ pub fn decrypt_transaction(
     let plaintext = cipher
         .decrypt(nonce, full_ciphertext.as_ref())
         .map_err(|e| {
-            TransactionError::DecryptionError(format!("AES-GCM decryption failed: {e}"))
+            KalaError::crypto(format!("AES-GCM decryption failed: {e}"))
         })?;
 
     // Deserialize from FlatBuffer
@@ -113,10 +114,10 @@ pub struct RSWTimelock {
 }
 
 impl RSWTimelock {
-    pub fn new(modulus_bits: usize) -> Result<Self> {
+    pub fn new(modulus_bits: usize) -> KalaResult<Self> {
         // Try to create GPU solver, fall back to CPU if not available
         let solver = Solver::default().or_else(|_| Solver::new(0)).map_err(|e| {
-            TransactionError::EncryptionError(format!("Failed to create RSW solver: {e}"))
+            KalaError::crypto(format!("Failed to create RSW solver: {e}"))
         })?;
 
         Ok(Self {
@@ -126,7 +127,7 @@ impl RSWTimelock {
     }
 
     /// Generate RSW puzzle parameters
-    pub fn generate_puzzle(&self, key: &[u8; AES_KEY_SIZE], hardness: u32) -> Result<RSWPuzzle> {
+    pub fn generate_puzzle(&self, key: &[u8; AES_KEY_SIZE], hardness: u32) -> KalaResult<RSWPuzzle> {
         use rug::integer::Order;
 
         // Generate safe RSA modulus n = p*q
@@ -158,13 +159,13 @@ impl RSWTimelock {
         let two = Integer::from(2);
         let reduced_exp = two
             .pow_mod(&Integer::from(hardness), &lambda)
-            .map_err(|e| TransactionError::EncryptionError(format!("pow_mod failed: {e}")))?;
+            .map_err(|e| KalaError::crypto(format!("pow_mod failed: {e}")))?;
 
         // Compute a^(2^hardness mod λ(n)) mod n (fast!)
         let a_power = a
             .clone()
             .pow_mod(&reduced_exp, &n)
-            .map_err(|e| TransactionError::EncryptionError(format!("pow_mod failed: {e}")))?;
+            .map_err(|e| KalaError::crypto(format!("pow_mod failed: {e}")))?;
 
         // C = (key + a^(2^hardness)) mod n
         let puzzle_value = (key_int + a_power) % &n;
@@ -183,7 +184,7 @@ impl RSWTimelock {
     }
 
     /// Solve RSW puzzle to recover key using GPU acceleration
-    pub fn solve_puzzle(&self, puzzle: &RSWPuzzle) -> Result<[u8; AES_KEY_SIZE]> {
+    pub fn solve_puzzle(&self, puzzle: &RSWPuzzle) -> KalaResult<[u8; AES_KEY_SIZE]> {
         // Convert to hex strings for the GPU solver
         let n_hex = hex::encode(&puzzle.n);
         let a_hex = hex::encode(&puzzle.a);
@@ -193,13 +194,13 @@ impl RSWTimelock {
         let result = self
             .solver
             .solve(&n_hex, &a_hex, &c_hex, puzzle.hardness)
-            .map_err(|e| TransactionError::DecryptionError(format!("RSW solve failed: {e}")))?;
+            .map_err(|e| KalaError::crypto(format!("RSW solve failed: {e}")))?;
 
         Ok(result.key)
     }
 
     /// Batch solve multiple puzzles in parallel on GPU
-    pub fn solve_batch(&self, puzzles: &[RSWPuzzle]) -> Result<Vec<[u8; AES_KEY_SIZE]>> {
+    pub fn solve_batch(&self, puzzles: &[RSWPuzzle]) -> KalaResult<Vec<[u8; AES_KEY_SIZE]>> {
         let puzzle_inputs: Vec<(String, String, String, u32)> = puzzles
             .iter()
             .map(|p| {
@@ -213,7 +214,7 @@ impl RSWTimelock {
             .collect();
 
         let results = self.solver.solve_batch(&puzzle_inputs).map_err(|e| {
-            TransactionError::DecryptionError(format!("Batch RSW solve failed: {e}"))
+            KalaError::crypto(format!("Batch RSW solve failed: {e}"))
         })?;
 
         Ok(results.into_iter().map(|r| r.key).collect())
@@ -236,7 +237,7 @@ pub fn create_timelock_transaction(
     ctx: &EncryptionContext,
     current_iteration: u64,
     hardness_factor: f64, // 0.0 to 1.0, typically 0.1
-) -> Result<TimelockTransaction> {
+) -> KalaResult<TimelockTransaction> {
     let current_tick = ctx.current_tick();
     let tick_size = ctx.tick_size;
 
@@ -276,7 +277,7 @@ pub fn create_timelock_transaction(
 }
 
 /// Decrypt a timelock transaction (requires solving the puzzle)
-pub fn decrypt_timelock_transaction(timelock_tx: &TimelockTransaction) -> Result<Transaction> {
+pub fn decrypt_timelock_transaction(timelock_tx: &TimelockTransaction) -> KalaResult<Transaction> {
     // Create solver
     let timelock = RSWTimelock::new(2048)?;
 
@@ -288,7 +289,7 @@ pub fn decrypt_timelock_transaction(timelock_tx: &TimelockTransaction) -> Result
 }
 
 /// Batch decrypt multiple timelock transactions using GPU acceleration
-pub fn decrypt_timelock_batch(timelock_txs: &[TimelockTransaction]) -> Result<Vec<Transaction>> {
+pub fn decrypt_timelock_batch(timelock_txs: &[TimelockTransaction]) -> KalaResult<Vec<Transaction>> {
     if timelock_txs.is_empty() {
         return Ok(vec![]);
     }

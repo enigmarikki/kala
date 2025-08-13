@@ -1,3 +1,38 @@
+//! Consensus Engine for Kala's Tick-Based Architecture
+//!
+//! This module implements the core consensus mechanism described in the Kala paper.
+//! The [`TickProcessor`] orchestrates the four-phase tick processing:
+//!
+//! 1. **Collection Phase** (0 to k/3): Timestamp transactions as they arrive
+//! 2. **Ordering Phase** (at k/3): Determine canonical transaction ordering  
+//! 3. **Decryption Phase** (k/3 to 2k/3): Decrypt timelock puzzles in parallel
+//! 4. **Validation Phase** (2k/3 to k): Validate and apply transactions
+//!
+//! # VDF Integration
+//!
+//! The consensus engine is tightly coupled with the VDF computation:
+//! - Transaction data is timestamped directly into the VDF hash chain
+//! - VDF iteration count determines phase boundaries
+//! - Tick certificates combine VDF proofs with consensus results
+//!
+//! # MEV Resistance
+//!
+//! Transaction ordering is determined before decryption, preventing:
+//! - Front-running attacks
+//! - Sandwich attacks  
+//! - MEV extraction through order manipulation
+//!
+//! # Example
+//!
+//! ```no_run
+//! use kala_core::consensus::TickProcessor;
+//! use std::sync::Arc;
+//! use tokio::sync::RwLock;
+//!
+//! let processor = TickProcessor::new(65536);
+//! // Process tick with VDF and state...
+//! ```
+
 use anyhow::Result;
 use sha2::{Digest, Sha256};
 use std::sync::Arc;
@@ -12,12 +47,51 @@ use kala_transaction::{
 };
 use kala_vdf::EternalVDF;
 
+/// Core consensus processor implementing Kala's tick-based architecture
+///
+/// The `TickProcessor` orchestrates the execution of blockchain ticks according
+/// to the four-phase protocol described in the Kala research paper. Each tick
+/// processes transactions in a deterministic, MEV-resistant manner.
+///
+/// # Architecture
+///
+/// - **Phase 1 (Collection)**: Timestamps encrypted transactions into VDF
+/// - **Phase 2 (Ordering)**: Commits to canonical transaction ordering  
+/// - **Phase 3 (Decryption)**: Decrypts timelock puzzles in parallel
+/// - **Phase 4 (Validation)**: Validates and applies decrypted transactions
+///
+/// # Thread Safety
+///
+/// All methods are async and thread-safe, designed to work with shared
+/// VDF and state instances across multiple tasks.
 pub struct TickProcessor {
+    /// Number of VDF iterations per tick (k parameter)
     iterations_per_tick: u64,
+    /// Shared encryption context for timelock operations
     encryption_ctx: Arc<EncryptionContext>,
 }
 
 impl TickProcessor {
+    /// Creates a new tick processor with the specified VDF parameters
+    ///
+    /// # Parameters
+    ///
+    /// - `iterations_per_tick`: Number of VDF iterations per tick (k parameter)
+    ///
+    /// # Returns
+    ///
+    /// A new `TickProcessor` configured for the given tick duration.
+    /// The encryption context is initialized with the same parameters
+    /// for timelock compatibility.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use kala_core::consensus::TickProcessor;
+    ///
+    /// // Standard configuration from the paper
+    /// let processor = TickProcessor::new(65536);
+    /// ```
     pub fn new(iterations_per_tick: u64) -> Self {
         let encryption_ctx = Arc::new(EncryptionContext::new(iterations_per_tick));
 
@@ -27,10 +101,100 @@ impl TickProcessor {
         }
     }
 
+    /// Returns a shared reference to the encryption context
+    ///
+    /// The encryption context is used by clients to create timelock
+    /// transactions that are compatible with this processor's timing
+    /// parameters.
+    ///
+    /// # Returns
+    ///
+    /// A shared reference to the [`EncryptionContext`] used for timelock operations.
     pub fn encryption_context(&self) -> Arc<EncryptionContext> {
         self.encryption_ctx.clone()
     }
 
+    /// Processes a complete blockchain tick using the four-phase protocol
+    ///
+    /// This is the main entry point for tick processing, implementing the complete
+    /// four-phase algorithm described in the Kala research paper. The function
+    /// orchestrates VDF computation, transaction ordering, decryption, and validation
+    /// in a deterministic, MEV-resistant manner.
+    ///
+    /// # Four-Phase Algorithm
+    ///
+    /// 1. **Collection Phase (0 to k/3)**:
+    ///    - Timestamps encrypted transactions into VDF hash chain
+    ///    - Maintains canonical arrival order
+    ///    - Creates unforgeable transaction history
+    ///
+    /// 2. **Ordering Phase (at k/3)**:
+    ///    - Commits to final transaction ordering
+    ///    - Based on VDF timestamped arrival order
+    ///    - Prevents MEV through pre-commitment
+    ///
+    /// 3. **Decryption Phase (k/3 to 2k/3)**:
+    ///    - Decrypts timelock puzzles in parallel
+    ///    - Uses GPU acceleration when available
+    ///    - Falls back to CPU if GPU fails
+    ///    - Continues VDF computation during decryption
+    ///
+    /// 4. **Validation Phase (2k/3 to k)**:
+    ///    - Validates decrypted transactions
+    ///    - Applies state transitions
+    ///    - Creates transaction merkle root
+    ///    - Completes remaining VDF iterations
+    ///
+    /// # Parameters
+    ///
+    /// - `tick_num`: The tick number being processed
+    /// - `vdf`: Shared reference to the eternal VDF computation
+    /// - `state`: Shared reference to the blockchain state
+    /// - `encrypted_txs`: List of timelock-encrypted transactions for this tick
+    ///
+    /// # Returns
+    ///
+    /// A [`TickCertificate`] containing:
+    /// - VDF proof and state at tick completion
+    /// - Transaction processing results
+    /// - Cryptographic commitments to tick contents
+    /// - Timestamp and linking information
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - VDF computation fails or becomes inconsistent
+    /// - Critical decryption failures occur
+    /// - State validation fails
+    /// - Database operations fail
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// use kala_core::consensus::TickProcessor;
+    /// use std::sync::Arc;
+    /// use tokio::sync::RwLock;
+    ///
+    /// # async fn example() -> anyhow::Result<()> {
+    /// let processor = TickProcessor::new(65536);
+    /// // Assuming vdf, state, and transactions are initialized...
+    /// # let vdf = Arc::new(RwLock::new(todo!()));
+    /// # let state = Arc::new(RwLock::new(todo!()));
+    /// # let encrypted_txs = vec![];
+    ///
+    /// let certificate = processor.process_tick(
+    ///     42,  // tick number
+    ///     vdf,
+    ///     state,
+    ///     encrypted_txs
+    /// ).await?;
+    ///
+    /// println!(\"Processed tick {} with {} transactions\", 
+    ///          certificate.tick_number, 
+    ///          certificate.transaction_count);
+    /// # Ok(())
+    /// # }
+    /// ```
     pub async fn process_tick(
         &self,
         tick_num: u64,
@@ -421,7 +585,41 @@ impl TickProcessor {
         hasher.finalize().into()
     }
 
-    // Graceful degradation for failed ticks (Algorithm 4 from paper)
+    /// Handles tick processing failures with graceful degradation
+    ///
+    /// This function implements Algorithm 4 from the Kala paper for handling
+    /// situations where tick processing cannot complete normally. It ensures
+    /// the VDF computation continues uninterrupted while creating a checkpoint
+    /// tick that maintains chain integrity.
+    ///
+    /// # Graceful Degradation Strategy
+    ///
+    /// 1. **Complete VDF iterations**: Finish remaining iterations for the tick
+    /// 2. **Create checkpoint tick**: Generate a valid tick certificate without transactions
+    /// 3. **Update state**: Maintain chain continuity and VDF checkpoints
+    /// 4. **Preserve timing**: Ensure subsequent ticks remain synchronized
+    ///
+    /// # When to Use
+    ///
+    /// This method should be called when:
+    /// - Transaction decryption fails catastrophically
+    /// - State validation encounters unrecoverable errors
+    /// - Network partitions prevent consensus
+    /// - System resource exhaustion occurs
+    ///
+    /// # Parameters
+    ///
+    /// - `tick_num`: The tick number that failed to process normally
+    /// - `vdf`: Shared reference to the eternal VDF computation
+    /// - `state`: Shared reference to the blockchain state
+    /// - `current_iteration`: Current VDF iteration when failure occurred
+    ///
+    /// # Returns
+    ///
+    /// A [`TickCertificate`] of type [`TickType::Checkpoint`] that:
+    /// - Contains no transactions but maintains VDF proof
+    /// - Preserves chain continuity and timing
+    /// - Allows the network to continue operation
     pub async fn handle_tick_failure(
         &self,
         tick_num: u64,
@@ -485,6 +683,34 @@ impl TickProcessor {
     }
 }
 
+/// Computes the Merkle root of a list of transaction hashes
+///
+/// This function builds a complete binary Merkle tree from the given hashes
+/// and returns the root hash. The implementation follows the standard approach:
+/// - If the number of hashes is odd, the last hash is duplicated
+/// - Pairs of hashes are concatenated and hashed together
+/// - The process continues until only one hash remains
+///
+/// # Parameters
+///
+/// - `hashes`: Slice of 32-byte hashes to build the tree from
+///
+/// # Returns
+///
+/// The 32-byte Merkle root hash. Returns all zeros if the input is empty.
+///
+/// # Example
+///
+/// ```
+/// use sha2::{Digest, Sha256};
+///
+/// let hash1 = Sha256::digest(b"transaction1").into();
+/// let hash2 = Sha256::digest(b"transaction2").into(); 
+/// let hashes = [hash1, hash2];
+///
+/// let root = compute_merkle_root(&hashes);
+/// assert_ne!(root, [0u8; 32]); // Non-empty root
+/// ```
 fn compute_merkle_root(hashes: &[[u8; 32]]) -> [u8; 32] {
     if hashes.is_empty() {
         return [0; 32];

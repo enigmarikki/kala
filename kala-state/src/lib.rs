@@ -1,10 +1,73 @@
-use anyhow::Result;
-use bincode::{Decode, Encode};
+//! # Kala State Management
+//!
+//! This crate provides comprehensive state management for the Kala blockchain,
+//! handling persistent storage, account management, and tick certificate tracking.
+//!
+//! ## Architecture Overview
+//!
+//! The state management system is built around two main components:
+//!
+//! ### [`ChainState`] - In-Memory State
+//! - Current blockchain state including accounts and balances
+//! - VDF checkpoint tracking for consensus
+//! - Timelock puzzle solution registry
+//! - Efficient in-memory operations for consensus processing
+//!
+//! ### [`StateDB`] - Persistent Storage  
+//! - RocksDB-backed persistent storage
+//! - Tick certificate archival and retrieval
+//! - State checkpoint persistence
+//! - Optimized for high-throughput tick processing
+//!
+//! ## Key Features
+//!
+//! ### Account Management
+//! - Balance tracking with overflow protection
+//! - Nonce-based replay attack prevention
+//! - Staking and delegation support
+//! - Efficient account lookup and updates
+//!
+//! ### Tick Certificate Storage
+//! - Persistent storage of all processed ticks
+//! - Fast retrieval by tick number
+//! - Recent tick queries for blockchain explorers
+//! - VDF certificate integration
+//!
+//! ### Timelock Integration
+//! - Puzzle solution tracking and verification
+//! - Integration with VDF timing for puzzle hardness
+//! - MEV-resistant transaction ordering support
+//!
+//! ## Example Usage
+//!
+//! ```no_run
+//! use kala_state::{StateDB, ChainState};
+//!
+//! # async fn example() -> kala_common::KalaResult<()> {
+//! // Initialize database
+//! let db = StateDB::open("./blockchain_state")?;
+//!
+//! // Load or create chain state
+//! let mut state = db.load_chain_state().await?;
+//!
+//! // Process account operations
+//! let alice = [1u8; 32];
+//! let bob = [2u8; 32];
+//! state.mint(&alice, 1000)?;
+//! state.transfer(&alice, &bob, 100)?;
+//!
+//! // Save state changes
+//! db.save_chain_state(&state).await?;
+//! # Ok(())
+//! # }
+//! ```
+
+use kala_common::prelude::*;
+use kala_common::types::Hash;
+use serde_json;
 use kala_vdf::{TickCertificate as VDFTickCertificate, VDFCheckpoint};
-use rocksdb::{Options, DB};
-use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::sync::Arc;
+use bincode::{Decode, Encode};
 
 pub mod account;
 pub mod tick;
@@ -12,106 +75,103 @@ pub mod tick;
 pub use account::{Account, AccountState};
 pub use tick::{TickCertificate, TickType};
 
-/// Global chain state
+/// Global chain state using kala-common types
 #[derive(Serialize, Deserialize, Encode, Decode, Clone)]
 pub struct ChainState {
-    pub current_tick: u64,
-    pub current_iteration: u64,
-    pub last_tick_hash: [u8; 32],
+    pub current_tick: BlockHeight,
+    pub current_iteration: IterationNumber,
+    pub last_tick_hash: Hash,
     pub total_transactions: u64,
     pub vdf_checkpoint: VDFCheckpoint,
     pub tick_size: u64, // k = 65536 by default
-    accounts: HashMap<[u8; 32], Account>,
-    puzzles: HashMap<[u8; 32], PuzzleState>,
+    accounts: HashMap<Hash, Account>,
+    puzzles: HashMap<Hash, PuzzleState>,
 }
 
 #[derive(Serialize, Deserialize, Encode, Decode, Clone)]
 pub struct PuzzleState {
-    pub solver: [u8; 32],
+    pub solver: Hash,
     pub solution_proof: Vec<u8>,
-    pub solved_at_tick: u64,
-    pub solved_at_iteration: u64,
+    pub solved_at_tick: BlockHeight,
+    pub solved_at_iteration: IterationNumber,
 }
 
-/// State database wrapper
+/// State database wrapper using kala-common database operations
 pub struct StateDB {
-    db: Arc<DB>,
+    db: KalaDatabase,
 }
 
 impl StateDB {
-    pub fn open(path: &str) -> Result<Self> {
-        let mut opts = Options::default();
-        opts.create_if_missing(true);
-        opts.set_compression_type(rocksdb::DBCompressionType::Lz4);
-
-        Ok(Self {
-            db: Arc::new(DB::open(&opts, path)?),
-        })
+    pub fn open(path: &str) -> KalaResult<Self> {
+        let db = KalaDatabase::new(path)?;
+        Ok(Self { db })
     }
 
-    pub fn load_chain_state(&self) -> Result<ChainState> {
-        match self.db.get(b"chain_state")? {
-            Some(data) => {
-                let (state, _) = bincode::decode_from_slice(&data, bincode::config::standard())?;
-                Ok(state)
-            }
+    pub async fn load_chain_state(&self) -> KalaResult<ChainState> {
+        match self.db.load_data("", "chain_state").await? {
+            Some(state) => Ok(state),
             None => Ok(ChainState::new()),
         }
     }
 
-    pub fn save_chain_state(&self, state: &ChainState) -> Result<()> {
-        let data = bincode::encode_to_vec(state, bincode::config::standard())?;
-        self.db.put(b"chain_state", &data)?;
-        Ok(())
+    pub async fn save_chain_state(&self, state: &ChainState) -> KalaResult<()> {
+        self.db.store_data("", "chain_state", state).await
     }
 
-    pub fn store_tick(&self, certificate: &TickCertificate) -> Result<()> {
-        let key = format!("tick:{:016x}", certificate.tick_number);
-        let value = bincode::encode_to_vec(certificate, bincode::config::standard())?;
-        self.db.put(key.as_bytes(), &value)?;
+    pub async fn store_tick(&self, certificate: &TickCertificate) -> KalaResult<()> {
+        let key = format!("{:016x}", certificate.tick_number);
+        // Use JSON serialization for external types
+        let json_data = serde_json::to_vec(certificate)
+            .map_err(|e| KalaError::serialization(format!("Failed to serialize tick certificate: {}", e)))?;
+        self.db.put_raw(format!("tick:{}", key).as_bytes(), &json_data)?;
 
         // Update index
-        self.update_tick_index(certificate.tick_number)?;
+        self.update_tick_index(certificate.tick_number).await?;
 
         Ok(())
     }
 
-    pub fn store_vdf_tick_certificate(&self, cert: &VDFTickCertificate) -> Result<()> {
-        let key = format!("vdf_tick:{:016x}", cert.tick_number);
-        let value = bincode::encode_to_vec(cert, bincode::config::standard())?;
-        self.db.put(key.as_bytes(), &value)?;
-        Ok(())
+    pub async fn store_vdf_tick_certificate(&self, cert: &VDFTickCertificate) -> KalaResult<()> {
+        let key = format!("{:016x}", cert.tick_number);
+        // Use JSON serialization for external types
+        let json_data = serde_json::to_vec(cert)
+            .map_err(|e| KalaError::serialization(format!("Failed to serialize VDF certificate: {}", e)))?;
+        self.db.put_raw(format!("vdf_tick:{}", key).as_bytes(), &json_data)
     }
 
-    pub fn get_vdf_tick_certificate(&self, tick_number: u64) -> Result<Option<VDFTickCertificate>> {
-        let key = format!("vdf_tick:{:016x}", tick_number);
-        match self.db.get(key.as_bytes())? {
+    pub async fn get_vdf_tick_certificate(&self, tick_number: u64) -> KalaResult<Option<VDFTickCertificate>> {
+        let key = format!("{:016x}", tick_number);
+        // Use JSON deserialization for external types
+        match self.db.get_raw(format!("vdf_tick:{}", key).as_bytes())? {
             Some(data) => {
-                let (cert, _) = bincode::decode_from_slice(&data, bincode::config::standard())?;
+                let cert = serde_json::from_slice(&data)
+                    .map_err(|e| KalaError::serialization(format!("Failed to deserialize VDF certificate: {}", e)))?;
                 Ok(Some(cert))
             }
             None => Ok(None),
         }
     }
 
-    pub fn get_tick(&self, tick_number: u64) -> Result<Option<TickCertificate>> {
-        let key = format!("tick:{:016x}", tick_number);
-        match self.db.get(key.as_bytes())? {
+    pub async fn get_tick(&self, tick_number: u64) -> KalaResult<Option<TickCertificate>> {
+        let key = format!("{:016x}", tick_number);
+        // Use JSON deserialization for external types
+        match self.db.get_raw(format!("tick:{}", key).as_bytes())? {
             Some(data) => {
-                let (cert, _) = bincode::decode_from_slice(&data, bincode::config::standard())?;
+                let cert = serde_json::from_slice(&data)
+                    .map_err(|e| KalaError::serialization(format!("Failed to deserialize tick certificate: {}", e)))?;
                 Ok(Some(cert))
             }
             None => Ok(None),
         }
     }
 
-    pub fn get_recent_ticks(&self, count: usize) -> Result<Vec<TickCertificate>> {
-        let index = self.get_tick_index()?;
+    pub async fn get_recent_ticks(&self, count: usize) -> KalaResult<Vec<TickCertificate>> {
+        let index = self.get_tick_index().await?;
         let start = index.saturating_sub(count as u64);
 
         let mut ticks = Vec::new();
         for i in start..=index {
-            if let Some(tick) = self.get_tick(i)? {
+            if let Some(tick) = self.get_tick(i).await? {
                 ticks.push(tick);
             }
         }
@@ -119,14 +179,23 @@ impl StateDB {
         Ok(ticks)
     }
 
-    fn update_tick_index(&self, tick_number: u64) -> Result<()> {
-        self.db.put(b"tick_index", &tick_number.to_le_bytes())?;
-        Ok(())
+    async fn update_tick_index(&self, tick_number: u64) -> KalaResult<()> {
+        // Use raw bytes for simple u64 storage
+        self.db.put_raw(b"tick_index", &tick_number.to_le_bytes())
     }
 
-    fn get_tick_index(&self) -> Result<u64> {
-        match self.db.get(b"tick_index")? {
-            Some(data) => Ok(u64::from_le_bytes(data.try_into().unwrap())),
+    async fn get_tick_index(&self) -> KalaResult<u64> {
+        // Use raw bytes for simple u64 retrieval
+        match self.db.get_raw(b"tick_index")? {
+            Some(bytes) => {
+                if bytes.len() == 8 {
+                    let mut array = [0u8; 8];
+                    array.copy_from_slice(&bytes);
+                    Ok(u64::from_le_bytes(array))
+                } else {
+                    Ok(0)
+                }
+            }
             None => Ok(0),
         }
     }
@@ -185,31 +254,31 @@ impl ChainState {
         self.vdf_checkpoint = checkpoint;
     }
 
-    pub fn get_account(&self, address: &[u8; 32]) -> Option<&Account> {
+    pub fn get_account(&self, address: &Hash) -> Option<&Account> {
         self.accounts.get(address)
     }
 
-    pub fn get_account_mut(&mut self, address: &[u8; 32]) -> &mut Account {
+    pub fn get_account_mut(&mut self, address: &Hash) -> &mut Account {
         self.accounts.entry(*address).or_insert(Account::new())
     }
 
-    pub fn get_balance(&self, address: &[u8; 32]) -> u64 {
+    pub fn get_balance(&self, address: &Hash) -> u64 {
         self.accounts.get(address).map(|a| a.balance).unwrap_or(0)
     }
 
-    pub fn get_account_nonce(&self, address: &[u8; 32]) -> Option<u64> {
+    pub fn get_account_nonce(&self, address: &Hash) -> Option<u64> {
         self.accounts.get(address).map(|a| a.nonce)
     }
 
-    pub fn update_nonce(&mut self, address: &[u8; 32], nonce: u64) {
+    pub fn update_nonce(&mut self, address: &Hash, nonce: u64) {
         self.get_account_mut(address).nonce = nonce;
     }
 
-    pub fn transfer(&mut self, from: &[u8; 32], to: &[u8; 32], amount: u64) -> Result<()> {
+    pub fn transfer(&mut self, from: &Hash, to: &Hash, amount: u64) -> KalaResult<()> {
         // Deduct from sender
         let sender = self.get_account_mut(from);
         if sender.balance < amount {
-            return Err(anyhow::anyhow!("Insufficient balance"));
+            return Err(KalaError::state("Insufficient balance"));
         }
         sender.balance -= amount;
 
@@ -220,16 +289,16 @@ impl ChainState {
         Ok(())
     }
 
-    pub fn mint(&mut self, address: &[u8; 32], amount: u64) -> Result<()> {
+    pub fn mint(&mut self, address: &Hash, amount: u64) -> KalaResult<()> {
         let account = self.get_account_mut(address);
         account.balance = account.balance.saturating_add(amount);
         Ok(())
     }
 
-    pub fn stake(&mut self, staker: &[u8; 32], validator: &[u8; 32], amount: u64) -> Result<()> {
+    pub fn stake(&mut self, staker: &Hash, validator: &Hash, amount: u64) -> KalaResult<()> {
         let account = self.get_account_mut(staker);
         if account.balance < amount {
-            return Err(anyhow::anyhow!("Insufficient balance"));
+            return Err(KalaError::state("Insufficient balance"));
         }
         account.balance -= amount;
         account.staked_amount += amount;
@@ -239,10 +308,10 @@ impl ChainState {
 
     pub fn record_puzzle_solution(
         &mut self,
-        solver: &[u8; 32],
-        puzzle_id: &[u8; 32],
+        solver: &Hash,
+        puzzle_id: &Hash,
         proof: &[u8],
-    ) -> Result<()> {
+    ) -> KalaResult<()> {
         self.puzzles.insert(
             *puzzle_id,
             PuzzleState {
@@ -274,3 +343,19 @@ impl ChainState {
         iteration % self.tick_size == 0 && iteration > 0
     }
 }
+
+// Implement KalaSerialize for state types
+impl KalaSerialize for ChainState {
+    fn preferred_encoding() -> EncodingType {
+        EncodingType::Bincode // Compact for frequent state persistence
+    }
+}
+
+impl KalaSerialize for PuzzleState {
+    fn preferred_encoding() -> EncodingType {
+        EncodingType::Bincode // Compact storage for puzzles
+    }
+}
+
+// Since we can't implement KalaSerialize for external types due to orphan rules,
+// we'll use direct serialization for these types in the database operations

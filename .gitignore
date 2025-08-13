@@ -1,2 +1,4 @@
 target/
 kala_db/
+kala_dev_db/
+.vscode

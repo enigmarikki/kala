@@ -1,18 +1,41 @@
+# Kala RPC - JSON-RPC API Server
+#
+# This crate provides the external API interface for Kala blockchain nodes.
+# It implements a JSON-RPC 2.0 server that allows clients to:
+# - Query blockchain state and information
+# - Submit timelock-encrypted transactions
+# - Retrieve tick certificates and historical data
+# - Access account information and balances
+#
+# The API is designed to be compatible with standard blockchain tooling
+# while providing Kala-specific functionality for VDF timestamping and
+# timelock transaction submission.
+
 [package]
 name = "kala-rpc"
 version.workspace = true
 authors.workspace = true
 edition.workspace = true
 license.workspace = true
+description = "JSON-RPC API server for Kala blockchain nodes"
+keywords = ["blockchain", "rpc", "api", "jsonrpc", "vdf"]
+categories = ["web-programming", "api-bindings"]
+repository.workspace = true
 
 [dependencies]
-jsonrpsee = { workspace = true }
-axum = { workspace = true }
-tower = { workspace = true }
-tokio = { workspace = true }
-serde = { workspace = true }
-anyhow = { workspace = true }
-tracing = { workspace = true }
-hex = { workspace = true }
-kala-transaction = { workspace = true }
-kala-state = { workspace = true }
+# Internal Kala crates
+kala-common = { workspace = true }                         # Shared types and utilities
+kala-transaction = { workspace = true }                    # Transaction types for RPC
+kala-state = { workspace = true }                          # State types for queries
+
+# JSON-RPC server implementation
+jsonrpsee = { workspace = true }                           # High-performance JSON-RPC server
+axum = { workspace = true }                                # HTTP framework (used by jsonrpsee)
+tower = { workspace = true }                               # Service abstraction
+
+# Core utilities
+tokio = { workspace = true }                               # Async runtime
+serde = { workspace = true }                               # Serialization for RPC types
+anyhow = { workspace = true }                              # Error handling
+tracing = { workspace = true }                             # Structured logging
+hex = { workspace = true }                                 # Hex encoding for addresses/data

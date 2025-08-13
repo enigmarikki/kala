@@ -1,15 +1,40 @@
+# Kala State - Blockchain State Management
+#
+# This crate manages the persistent state of the Kala blockchain including:
+# - Account balances, nonces, and staking information
+# - Tick certificates and VDF checkpoints  
+# - Timelock puzzle solutions and proofs
+# - Database persistence and serialization
+#
+# The state management is designed to be efficient for the tick-based
+# architecture, with fast access patterns for account queries and 
+# tick certificate retrieval.
+
 [package]
 name = "kala-state"
 version.workspace = true
 authors.workspace = true
 edition.workspace = true
 license.workspace = true
+description = "Blockchain state management for Kala VDF-based consensus"
+keywords = ["blockchain", "state", "database", "persistence"]
+categories = ["database", "cryptography"]
+repository.workspace = true
 
 [dependencies]
-rocksdb = { workspace = true }
-serde = { workspace = true }
-bincode = { workspace = true }
-anyhow = { workspace = true }
-sha2 = { workspace = true }
-kala-vdf = { workspace = true }
-tracing = { workspace = true }
+# Internal Kala crates
+kala-common = { workspace = true }                         # Shared types and database utilities
+kala-vdf = { workspace = true }                            # VDF types for checkpoints
+
+# Database and persistence
+rocksdb = { workspace = true }                             # High-performance key-value store
+
+# Serialization
+serde = { workspace = true }                               # Serialization framework
+bincode = { workspace = true }                             # Compact binary serialization
+serde_json = { workspace = true }                          # JSON serialization for external types
+
+# Cryptography and utilities
+sha2 = { workspace = true }                                # Hash functions for tick certificates
+anyhow = { workspace = true }                              # Error handling
+tracing = { workspace = true }                             # Structured logging
