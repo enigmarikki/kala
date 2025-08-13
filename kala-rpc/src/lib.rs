@@ -63,6 +63,10 @@ use jsonrpsee::{core::RpcResult, proc_macros::rpc, server::ServerBuilder};
 use kala_state::TickCertificate;
 use std::net::SocketAddr;
 
+fn default_iterations_per_tick() -> u64 {
+    1024 // Default to fast mode for backward compatibility
+}
+
 /// Current blockchain and VDF state information
 ///
 /// This structure contains a comprehensive snapshot of the current
@@ -82,6 +86,9 @@ pub struct ChainInfo {
     pub total_transactions: u64,
     /// Number of accounts with non-zero state
     pub accounts: usize,
+    /// Number of VDF iterations per tick (k parameter)
+    #[serde(default = "default_iterations_per_tick")]
+    pub iterations_per_tick: u64,
 }
 
 /// Request to submit a timelock-encrypted transaction

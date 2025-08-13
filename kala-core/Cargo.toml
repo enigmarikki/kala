@@ -65,6 +65,30 @@ bindgen = { workspace = true }                             # C++ bindings genera
 name = "devnode"
 path = "bin/devnode.rs"
 
+# Genesis initializer binary - initialize genesis state with 100M KALA for 0x account
+# Usage: cargo run -p kala-core --bin genesis-init -- --help
+[[bin]]
+name = "genesis-init"
+path = "bin/genesis-init.rs"
+
+# Client demo binary - sends RSW encrypted transactions to the leader node
+# Usage: cargo run -p kala-core --bin client-demo -- --help
+[[bin]]
+name = "client-demo"
+path = "bin/client-demo.rs"
+
+# Benchmark client binary - sends RSW timelock transactions
+# Usage: cargo run -p kala-core --bin bench-client -- --help
+[[bin]]
+name = "bench-client"
+path = "bin/bench-client.rs"
+
+# Multi-node production binary - Byzantine fault tolerant consensus
+# Usage: cargo run -p kala-core --bin multinode -- --node-id node0 --peers node1@127.0.0.1:9002
+[[bin]]
+name = "multinode"
+path = "bin/multinode.rs"
+
 # Build-time dependencies for C++ integration
 [build-dependencies]
 bindgen = "0.72.0"                                         # Generate Rust bindings for C++ VDF code

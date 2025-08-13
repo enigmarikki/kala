@@ -104,6 +104,36 @@ pub struct NodeConfig {
     /// HTTP endpoint serving metrics in Prometheus format.
     /// Only active when enable_metrics is true.
     pub metrics_port: u16,
+
+    /// Node identifier for multi-node consensus
+    /// 
+    /// Unique identifier for this node in the network.
+    /// Must be unique across all nodes in the network.
+    pub node_id: String,
+
+    /// List of peer nodes for networking
+    /// 
+    /// Format: "node_id@ip:port"
+    /// Example: ["node1@127.0.0.1:9001", "node2@127.0.0.1:9002"]
+    pub peers: Vec<String>,
+
+    /// P2P networking port
+    /// 
+    /// Port for inter-node communication including consensus,
+    /// transaction forwarding, and state synchronization.
+    pub p2p_port: u16,
+
+    /// Leader rotation interval in ticks
+    /// 
+    /// Number of ticks each leader serves before rotation.
+    /// Lower values provide better load distribution but more overhead.
+    pub leader_rotation_interval: u64,
+
+    /// Minimum number of nodes required for consensus
+    /// 
+    /// Byzantine fault tolerance requires >= 3f+1 nodes where f is
+    /// the maximum number of Byzantine nodes tolerated.
+    pub min_consensus_nodes: usize,
 }
 
 impl Default for NodeConfig {
@@ -142,6 +172,11 @@ impl Default for NodeConfig {
             log_level: "info".to_string(),
             enable_metrics: false,
             metrics_port: 9090,
+            node_id: "node0".to_string(),
+            peers: vec![],
+            p2p_port: 9001,
+            leader_rotation_interval: 100, // Every 100 ticks
+            min_consensus_nodes: 4, // Support up to 1 Byzantine node (3*1+1=4)
         }
     }
 }

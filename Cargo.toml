@@ -54,7 +54,7 @@ kala-vdf = { path = "kala-vdf" }                           # VDF utilities
 tokio = { version = "1.35", features = ["full"] }           # Async runtime for concurrent operations
 axum = "0.8.4"                                              # Web framework for HTTP APIs
 tower = "0.5.2"                                             # Service abstraction layer
-jsonrpsee = { version = "0.25.1", features = ["server", "macros"] }  # JSON-RPC implementation
+jsonrpsee = { version = "0.25.1", features = ["server", "macros", "http-client"] }  # JSON-RPC implementation
 futures = "0.3"                                             # Future combinators and utilities
 
 # Serialization and data handling

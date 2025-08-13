@@ -9,7 +9,7 @@ use aes_gcm::{
     aead::{Aead, AeadCore, KeyInit, OsRng},
     Aes256Gcm, Key, Nonce,
 };
-use rand::Rng;
+use rand::{Rng, RngCore};
 use rug::{rand::RandState, Integer};
 use std::sync::Arc;
 use timelocks::Solver;
@@ -241,19 +241,14 @@ pub fn create_timelock_transaction(
     let current_tick = ctx.current_tick();
     let tick_size = ctx.tick_size;
 
-    // Calculate remaining iterations in current tick
-    let tick_start = current_tick * tick_size;
-    let tick_end = (current_tick + 1) * tick_size;
-    let remaining = tick_end - current_iteration;
-
-    // Calculate hardness: min(k/10, remaining/2)
-    let max_hardness = (tick_size as f64 * hardness_factor) as u32;
-    let safe_hardness = (remaining / 2) as u32;
-    let hardness = max_hardness.min(safe_hardness).max(1);
+    // Fixed hardness calculation based on configured factor
+    // No randomness, deterministic based on tick size and factor
+    let hardness = (tick_size as f64 * hardness_factor) as u32;
+    let hardness = hardness.max(1); // Minimum 1 iteration
 
     // Generate encryption key
     let mut key = [0u8; AES_KEY_SIZE];
-    rand::thread_rng().fill(&mut key);
+    rand::rng().fill(&mut key);
 
     // Encrypt transaction
     let encrypted_data = encrypt_transaction(tx, &key)?;
@@ -263,11 +258,14 @@ pub fn create_timelock_transaction(
     let puzzle = timelock.generate_puzzle(&key, hardness)?;
 
     tracing::debug!(
-        "Created timelock puzzle with hardness {} on GPU: {}",
+        "Created timelock puzzle with hardness {} (factor: {}, tick_size: {}) on GPU: {}",
         hardness,
+        hardness_factor,
+        tick_size,
         timelock.device_name()
     );
 
+    // Note: target_tick will be overridden by the client to the future tick
     Ok(TimelockTransaction {
         encrypted_data,
         puzzle,

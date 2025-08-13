@@ -36,5 +36,6 @@ serde_json = { workspace = true }                          # JSON serialization 
 
 # Cryptography and utilities
 sha2 = { workspace = true }                                # Hash functions for tick certificates
+hex = { workspace = true }                                 # Hex encoding for hash keys
 anyhow = { workspace = true }                              # Error handling
 tracing = { workspace = true }                             # Structured logging

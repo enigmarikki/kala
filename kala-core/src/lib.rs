@@ -44,6 +44,12 @@ pub mod config;
 /// Consensus implementation
 pub mod consensus;
 
+/// Multi-node Byzantine consensus
+pub mod consensus_multi;
+
+/// P2P Networking
+pub mod network;
+
 /// Node implementation
 pub mod node;
 

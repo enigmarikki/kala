@@ -84,7 +84,10 @@ pub struct ChainState {
     pub total_transactions: u64,
     pub vdf_checkpoint: VDFCheckpoint,
     pub tick_size: u64, // k = 65536 by default
+    // Use hex strings as keys for JSON serialization compatibility
+    #[serde(with = "hash_map_hex_keys")]
     accounts: HashMap<Hash, Account>,
+    #[serde(with = "hash_map_hex_keys_puzzle")]
     puzzles: HashMap<Hash, PuzzleState>,
 }
 
@@ -359,3 +362,74 @@ impl KalaSerialize for PuzzleState {
 
 // Since we can't implement KalaSerialize for external types due to orphan rules,
 // we'll use direct serialization for these types in the database operations
+
+// Custom serialization modules for HashMap<Hash, T> to use hex strings as keys
+mod hash_map_hex_keys {
+    use super::*;
+    use serde::{Deserializer, Serializer, Deserialize};
+    use std::collections::HashMap;
+
+    pub fn serialize<S>(map: &HashMap<Hash, Account>, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let mut string_map = HashMap::new();
+        for (k, v) in map {
+            string_map.insert(hex::encode(k), v);
+        }
+        string_map.serialize(serializer)
+    }
+
+    pub fn deserialize<'de, D>(deserializer: D) -> Result<HashMap<Hash, Account>, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let string_map: HashMap<String, Account> = HashMap::deserialize(deserializer)?;
+        let mut hash_map = HashMap::new();
+        for (k, v) in string_map {
+            let bytes = hex::decode(&k).map_err(serde::de::Error::custom)?;
+            if bytes.len() != 32 {
+                return Err(serde::de::Error::custom("Hash must be 32 bytes"));
+            }
+            let mut hash = [0u8; 32];
+            hash.copy_from_slice(&bytes);
+            hash_map.insert(hash, v);
+        }
+        Ok(hash_map)
+    }
+}
+
+mod hash_map_hex_keys_puzzle {
+    use super::*;
+    use serde::{Deserializer, Serializer, Deserialize};
+    use std::collections::HashMap;
+
+    pub fn serialize<S>(map: &HashMap<Hash, PuzzleState>, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let mut string_map = HashMap::new();
+        for (k, v) in map {
+            string_map.insert(hex::encode(k), v);
+        }
+        string_map.serialize(serializer)
+    }
+
+    pub fn deserialize<'de, D>(deserializer: D) -> Result<HashMap<Hash, PuzzleState>, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let string_map: HashMap<String, PuzzleState> = HashMap::deserialize(deserializer)?;
+        let mut hash_map = HashMap::new();
+        for (k, v) in string_map {
+            let bytes = hex::decode(&k).map_err(serde::de::Error::custom)?;
+            if bytes.len() != 32 {
+                return Err(serde::de::Error::custom("Hash must be 32 bytes"));
+            }
+            let mut hash = [0u8; 32];
+            hash.copy_from_slice(&bytes);
+            hash_map.insert(hash, v);
+        }
+        Ok(hash_map)
+    }
+}

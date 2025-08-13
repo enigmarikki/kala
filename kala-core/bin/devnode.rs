@@ -9,7 +9,7 @@ use std::sync::Arc;
 #[command(about = "Kala development node - the eternal timeline", long_about = None)]
 struct Args {
     /// Database path
-    #[arg(short, long, default_value = "./kala_dev_db")]
+    #[arg(short, long, default_value = "./kala_db")]
     db_path: String,
 
     /// RPC port
@@ -17,7 +17,7 @@ struct Args {
     rpc_port: u16,
 
     /// Iterations per tick (also determines tick duration)
-    #[arg(short, long, default_value = "65536")]
+    #[arg(short, long, default_value = "655360")]
     iterations_per_tick: u64,
 
     /// Use fast mode (1 second ticks, 1024 iterations)

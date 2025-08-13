@@ -6,6 +6,7 @@ use tracing::{debug, error, info, warn};
 
 use crate::config::NodeConfig;
 use crate::consensus::TickProcessor;
+use crate::network::{NetworkManager, NetworkChannels, NetworkMessage, LeaderState};
 use kala_rpc::{
     AccountInfo, ChainInfo, GetAccountRequest, GetTickRequest, KalaApiServer,
     SubmitTransactionRequest, SubmitTransactionResponse,
@@ -29,6 +30,7 @@ pub struct KalaRpcHandler {
 const TX_ACCEPTANCE_WINDOW_START: f64 = 0.9; // Accept txs starting at 90% of previous tick
 const TX_ACCEPTANCE_WINDOW_END: f64 = 0.3; // Accept txs until 30% of target tick
 
+#[derive(Clone)]
 pub struct KalaNode {
     config: NodeConfig,
     vdf: Arc<RwLock<EternalVDF>>,
@@ -37,6 +39,10 @@ pub struct KalaNode {
     tick_processor: Arc<TickProcessor>,
     // Transaction pool for encrypted transactions
     tx_pool: Arc<Mutex<Vec<TimelockTransaction>>>,
+    // Network manager for multi-node consensus
+    network_manager: Option<Arc<NetworkManager>>,
+    // Network message channels
+    network_channels: Option<NetworkChannels>,
 }
 
 impl KalaNode {
@@ -55,6 +61,20 @@ impl KalaNode {
 
         // Create tick processor with proper parameters
         let tick_processor = Arc::new(TickProcessor::new(config.iterations_per_tick));
+
+        // Initialize network manager for multi-node setup
+        let (network_manager, network_channels) = if !config.peers.is_empty() {
+            let (network, channels) = NetworkManager::new(
+                config.node_id.clone(),
+                config.p2p_port,
+                config.leader_rotation_interval,
+                config.min_consensus_nodes,
+            );
+            (Some(Arc::new(network)), Some(channels))
+        } else {
+            info!("Running in single-node mode - no network manager initialized");
+            (None, None)
+        };
 
         info!("Initialized Kala node - The Eternal Timeline");
         info!(
@@ -78,6 +98,8 @@ impl KalaNode {
             state_db,
             tick_processor,
             tx_pool: Arc::new(Mutex::new(Vec::new())),
+            network_manager,
+            network_channels,
         })
     }
 
@@ -104,6 +126,23 @@ impl KalaNode {
             submit_tx,
             state_db: self.state_db.clone(),
         };
+
+        // Start network manager if configured for multi-node
+        if let Some(ref network) = self.network_manager {
+            info!("Starting network manager for multi-node consensus");
+            if let Err(e) = network.start(self.config.peers.clone()).await {
+                error!("Failed to start network manager: {}", e);
+                return Err(e);
+            }
+        }
+
+        // Handle network messages if in multi-node mode
+        let self_clone = Arc::new(self.clone());
+        if let Some(channels) = self.network_channels.as_ref() {
+            // TODO: Handle network messages in separate task
+            // This would need to be restructured to avoid ownership issues
+            info!("Network message handling will be implemented");
+        }
 
         // Start RPC server in separate task
         let rpc_port = self.config.rpc_port;
@@ -138,6 +177,7 @@ impl KalaNode {
                             hash_chain: hex::encode(vdf.get_hash_chain()),
                             total_transactions: state.total_transactions,
                             accounts: state.get_account_count(),
+                            iterations_per_tick: rpc_node.config.iterations_per_tick,
                         };
 
                         let _ = reply_tx.send(info).await;
@@ -158,7 +198,7 @@ impl KalaNode {
                             continue;
                         }
 
-                        // Check if we're in the acceptance window for this tick
+                        // Calculate acceptance window for this tick
                         let target_tick_start = tx.target_tick * k;
                         let target_tick_end = (tx.target_tick + 1) * k;
                         let acceptance_start = if tx.target_tick == 0 {
@@ -168,10 +208,34 @@ impl KalaNode {
                         };
                         let acceptance_end = target_tick_start + ((k as f64 * TX_ACCEPTANCE_WINDOW_END) as u64);
 
-                        if current_iter < acceptance_start || current_iter > acceptance_end {
+                        // Accept transactions that are either:
+                        // 1. In the acceptance window now
+                        // 2. For future ticks (will be held in pool until their window)
+                        let is_in_window = current_iter >= acceptance_start && current_iter <= acceptance_end;
+                        let is_future = current_iter < acceptance_start;
+                        
+                        if !is_in_window && !is_future {
+                            // Optimistic forwarding: send to next leader instead of rejecting
+                            if let Some(ref network) = rpc_node.network_manager {
+                                if !network.is_leader().await {
+                                    // Forward to current leader for continuous processing
+                                    info!("Forwarding transaction to leader for tick {}", tx.target_tick);
+                                    if let Err(e) = network.forward_transactions(vec![tx.clone()], tx.target_tick).await {
+                                        warn!("Failed to forward transaction: {}", e);
+                                    }
+                                    let _ = reply_tx.send(Ok(SubmitTransactionResponse {
+                                        tx_hash: "forwarded".to_string(),
+                                        submission_iteration: tx.submission_iteration,
+                                        target_tick: tx.target_tick,
+                                    })).await;
+                                    continue;
+                                }
+                            }
+                            
+                            // Only reject if we're past the acceptance window and can't forward
                             let _ = reply_tx.send(Err(format!(
-                                "Outside acceptance window for tick {} (current iter: {}, window: {}-{})",
-                                tx.target_tick, current_iter, acceptance_start, acceptance_end
+                                "Past acceptance window for tick {} (current iter: {}, window ended at: {})",
+                                tx.target_tick, current_iter, acceptance_end
                             ))).await;
                             continue;
                         }
