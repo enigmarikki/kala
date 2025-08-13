@@ -48,7 +48,7 @@ COPY kala-rpc/ ./kala-rpc/
 COPY kala-state/ ./kala-state/
 COPY kala-transaction/ ./kala-transaction/
 COPY kala-vdf/ ./kala-vdf/
-
+COPY kala-common/ ./kala-common/
 # Copy native code dependencies
 COPY tick/ ./tick/
 COPY timelocks/ ./timelocks/
