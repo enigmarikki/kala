@@ -46,8 +46,8 @@ Kala implements a novel VDF-based consensus mechanism with the following key com
 
 1. **Collection Phase** (0 to k/3): Timestamp encrypted transactions as they arrive
 2. **Ordering Phase** (at k/3): Commit to canonical transaction ordering 
-3. **Decryption Phase** (k/3 to 2k/3): Decrypt timelock puzzles in parallel
-4. **Validation Phase** (2k/3 to k): Validate and apply decrypted transactions
+3. **Validation Phase** (k/3 to 2k/3): Validate and apply decrypted transactions
+4. **Decryption Phase** (2k/3 to k): Decrypt timelock puzzles in parallel
 
 ---
 
