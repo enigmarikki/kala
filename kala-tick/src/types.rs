@@ -30,7 +30,7 @@ pub enum CVDFError {
     DivisionError,
 
     #[error("Invalid form")]
-    InvalidForm
+    InvalidForm,
 }
 
 pub type Result<T> = std::result::Result<T, CVDFError>;
