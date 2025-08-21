@@ -6,9 +6,9 @@ use kala_common::types::{Hash, PublicKey, Signature};
 pub use crate::generated::tx::{Bytes128, Bytes32, Nonce96, Tag128};
 
 // Helper type aliases using kala-common types
-pub type Bytes32Array = Hash;  // Use Hash from kala-common
-pub type PublicKeyArray = PublicKey;  // Use PublicKey from kala-common
-pub type SignatureArray = Signature;  // Use Signature from kala-common
+pub type Bytes32Array = Hash; // Use Hash from kala-common
+pub type PublicKeyArray = PublicKey; // Use PublicKey from kala-common
+pub type SignatureArray = Signature; // Use Signature from kala-common
 pub type Nonce96Array = [u8; 12];
 pub type Tag128Array = [u8; 16];
 
@@ -72,7 +72,7 @@ impl Send {
     pub fn validate(&self) -> KalaResult<()> {
         if self.signature.len() != 64 {
             return Err(KalaError::validation(format!(
-                "Invalid signature size: expected 64, got {}", 
+                "Invalid signature size: expected 64, got {}",
                 self.signature.len()
             )));
         }
@@ -84,13 +84,13 @@ impl Solve {
     pub fn validate(&self) -> KalaResult<()> {
         if self.signature.len() != 64 {
             return Err(KalaError::validation(format!(
-                "Invalid signature size: expected 64, got {}", 
+                "Invalid signature size: expected 64, got {}",
                 self.signature.len()
             )));
         }
         if self.proof.len() != 256 {
             return Err(KalaError::validation(format!(
-                "Invalid proof size: expected 256, got {}", 
+                "Invalid proof size: expected 256, got {}",
                 self.proof.len()
             )));
         }
@@ -141,7 +141,7 @@ pub struct RSWPuzzle {
 }
 
 // Use constants from kala-common instead of duplicating
-pub use kala_common::types::sizes::{AES_KEY_SIZE, TAG_SIZE, NONCE_SIZE};
+pub use kala_common::types::sizes::{AES_KEY_SIZE, NONCE_SIZE, TAG_SIZE};
 pub const EMPTY64BYTES: [u8; 64] = [0u8; 64];
 
 // Implement KalaSerialize for all transaction types

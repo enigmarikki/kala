@@ -62,12 +62,12 @@
 //! # }
 //! ```
 
+use bincode::{Decode, Encode};
 use kala_common::prelude::*;
 use kala_common::types::Hash;
-use serde_json;
 use kala_vdf::{TickCertificate as VDFTickCertificate, VDFCheckpoint};
+use serde_json;
 use std::collections::HashMap;
-use bincode::{Decode, Encode};
 
 pub mod account;
 pub mod tick;
@@ -121,9 +121,11 @@ impl StateDB {
     pub async fn store_tick(&self, certificate: &TickCertificate) -> KalaResult<()> {
         let key = format!("{:016x}", certificate.tick_number);
         // Use JSON serialization for external types
-        let json_data = serde_json::to_vec(certificate)
-            .map_err(|e| KalaError::serialization(format!("Failed to serialize tick certificate: {}", e)))?;
-        self.db.put_raw(format!("tick:{}", key).as_bytes(), &json_data)?;
+        let json_data = serde_json::to_vec(certificate).map_err(|e| {
+            KalaError::serialization(format!("Failed to serialize tick certificate: {}", e))
+        })?;
+        self.db
+            .put_raw(format!("tick:{}", key).as_bytes(), &json_data)?;
 
         // Update index
         self.update_tick_index(certificate.tick_number).await?;
@@ -134,18 +136,27 @@ impl StateDB {
     pub async fn store_vdf_tick_certificate(&self, cert: &VDFTickCertificate) -> KalaResult<()> {
         let key = format!("{:016x}", cert.tick_number);
         // Use JSON serialization for external types
-        let json_data = serde_json::to_vec(cert)
-            .map_err(|e| KalaError::serialization(format!("Failed to serialize VDF certificate: {}", e)))?;
-        self.db.put_raw(format!("vdf_tick:{}", key).as_bytes(), &json_data)
+        let json_data = serde_json::to_vec(cert).map_err(|e| {
+            KalaError::serialization(format!("Failed to serialize VDF certificate: {}", e))
+        })?;
+        self.db
+            .put_raw(format!("vdf_tick:{}", key).as_bytes(), &json_data)
     }
 
-    pub async fn get_vdf_tick_certificate(&self, tick_number: u64) -> KalaResult<Option<VDFTickCertificate>> {
+    pub async fn get_vdf_tick_certificate(
+        &self,
+        tick_number: u64,
+    ) -> KalaResult<Option<VDFTickCertificate>> {
         let key = format!("{:016x}", tick_number);
         // Use JSON deserialization for external types
         match self.db.get_raw(format!("vdf_tick:{}", key).as_bytes())? {
             Some(data) => {
-                let cert = serde_json::from_slice(&data)
-                    .map_err(|e| KalaError::serialization(format!("Failed to deserialize VDF certificate: {}", e)))?;
+                let cert = serde_json::from_slice(&data).map_err(|e| {
+                    KalaError::serialization(format!(
+                        "Failed to deserialize VDF certificate: {}",
+                        e
+                    ))
+                })?;
                 Ok(Some(cert))
             }
             None => Ok(None),
@@ -157,8 +168,12 @@ impl StateDB {
         // Use JSON deserialization for external types
         match self.db.get_raw(format!("tick:{}", key).as_bytes())? {
             Some(data) => {
-                let cert = serde_json::from_slice(&data)
-                    .map_err(|e| KalaError::serialization(format!("Failed to deserialize tick certificate: {}", e)))?;
+                let cert = serde_json::from_slice(&data).map_err(|e| {
+                    KalaError::serialization(format!(
+                        "Failed to deserialize tick certificate: {}",
+                        e
+                    ))
+                })?;
                 Ok(Some(cert))
             }
             None => Ok(None),

@@ -25,6 +25,7 @@ members = [
     "kala-rpc",                 # JSON-RPC API server
     "kala-transaction",         # Transaction types and processing
     "kala-vdf",                 # VDF implementations and utilities
+    "kala-tick"                 # CVDF streamer to replace old tick
 ]
 
 # Shared package metadata for all workspace members
@@ -47,6 +48,7 @@ kala-state = { path = "kala-state" }                       # State management
 kala-rpc = { path = "kala-rpc" }                           # JSON-RPC API
 kala-transaction = { path = "kala-transaction" }           # Transaction handling
 kala-vdf = { path = "kala-vdf" }                           # VDF utilities
+kala-tick = { path = "kala-tick"}                          # CVDF streamer to replace old tick
 
 # External dependencies - grouped by category
 
@@ -66,13 +68,13 @@ hex = "0.4"                                                 # Hex encoding/decod
 # Cryptography and security
 sha2 = "0.10"                                               # SHA-2 hash functions
 aes-gcm = "0.10"                                            # AES-GCM authenticated encryption
-rand = "0.9.2"                                              # Random number generation
+rand = "0.8.5"                                              # Random number generation
 rug = { version = "1.24", features = ["integer", "rand"] } # High-precision arithmetic (GMP bindings)
 
 # Mathematical libraries for VDF operations
-num-bigint = "0.4"                                          # Arbitrary precision integers
+num-bigint = {version = "0.4.6", features = ["rand", "serde"]}                                          # Arbitrary precision integers
 num-traits = "0.2"                                          # Numeric trait abstractions
-
+num-integer = "0.1"
 # Storage and persistence
 rocksdb = "0.23"                                            # Embedded key-value database
 

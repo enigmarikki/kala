@@ -1,13 +1,13 @@
 //! Database operation patterns and utilities
 
-use std::sync::Arc;
-use rocksdb::{DB, Options};
 use crate::{
-    error::{KalaResult, KalaError},
+    error::{KalaError, KalaResult},
     serialization::KalaSerialize,
 };
 use async_trait::async_trait;
-use serde::{Serialize, Deserialize};
+use rocksdb::{Options, DB};
+use serde::{Deserialize, Serialize};
+use std::sync::Arc;
 
 /// Database operations trait
 #[async_trait]
@@ -68,9 +68,7 @@ impl KalaDatabase {
         let db = DB::open(&opts, path)
             .map_err(|e| KalaError::database(format!("Failed to open database: {}", e)))?;
 
-        Ok(Self {
-            db: Arc::new(db),
-        })
+        Ok(Self { db: Arc::new(db) })
     }
 
     /// Format key with prefix
@@ -80,23 +78,17 @@ impl KalaDatabase {
 
     /// Get raw value from database
     pub fn get_raw(&self, key: &[u8]) -> KalaResult<Option<Vec<u8>>> {
-        self.db
-            .get(key)
-            .map_err(KalaError::from)
+        self.db.get(key).map_err(KalaError::from)
     }
 
     /// Put raw value to database
     pub fn put_raw(&self, key: &[u8], value: &[u8]) -> KalaResult<()> {
-        self.db
-            .put(key, value)
-            .map_err(KalaError::from)
+        self.db.put(key, value).map_err(KalaError::from)
     }
 
     /// Delete raw key from database
     pub fn delete_raw(&self, key: &[u8]) -> KalaResult<()> {
-        self.db
-            .delete(key)
-            .map_err(KalaError::from)
+        self.db.delete(key).map_err(KalaError::from)
     }
 
     /// Get database statistics
@@ -109,8 +101,7 @@ impl KalaDatabase {
 
     /// Compact database
     pub fn compact(&self) -> KalaResult<()> {
-        self.db
-            .compact_range::<&[u8], &[u8]>(None, None);
+        self.db.compact_range::<&[u8], &[u8]>(None, None);
         Ok(())
     }
 
@@ -129,9 +120,10 @@ impl DatabaseOps for KalaDatabase {
         data: &T,
     ) -> KalaResult<()> {
         let formatted_key = Self::format_key(prefix, key);
-        let encoded = data.encode()
+        let encoded = data
+            .encode()
             .map_err(|e| KalaError::serialization(format!("Failed to encode data: {}", e)))?;
-        
+
         self.put_raw(formatted_key.as_bytes(), &encoded)
     }
 
@@ -141,11 +133,12 @@ impl DatabaseOps for KalaDatabase {
         key: &str,
     ) -> KalaResult<Option<T>> {
         let formatted_key = Self::format_key(prefix, key);
-        
+
         match self.get_raw(formatted_key.as_bytes())? {
             Some(bytes) => {
-                let data = T::decode(&bytes)
-                    .map_err(|e| KalaError::serialization(format!("Failed to decode data: {}", e)))?;
+                let data = T::decode(&bytes).map_err(|e| {
+                    KalaError::serialization(format!("Failed to decode data: {}", e))
+                })?;
                 Ok(Some(data))
             }
             None => Ok(None),
@@ -167,16 +160,19 @@ impl DatabaseOps for KalaDatabase {
         let prefix_with_separator = format!("{}:", prefix);
         let prefix_bytes = prefix_with_separator.as_bytes();
 
-        let iter = self.db.iterator(rocksdb::IteratorMode::From(prefix_bytes, rocksdb::Direction::Forward));
-        
+        let iter = self.db.iterator(rocksdb::IteratorMode::From(
+            prefix_bytes,
+            rocksdb::Direction::Forward,
+        ));
+
         for item in iter {
             let (key, _) = item.map_err(KalaError::from)?;
             let key_str = String::from_utf8_lossy(&key);
-            
+
             if !key_str.starts_with(&prefix_with_separator) {
                 break;
             }
-            
+
             // Extract the actual key part after the prefix
             if let Some(actual_key) = key_str.strip_prefix(&prefix_with_separator) {
                 keys.push(actual_key.to_string());
@@ -194,14 +190,13 @@ impl DatabaseOps for KalaDatabase {
 
         for (prefix, key, data) in operations {
             let formatted_key = Self::format_key(&prefix, &key);
-            let encoded = data.encode()
-                .map_err(|e| KalaError::serialization(format!("Failed to encode batch data: {}", e)))?;
+            let encoded = data.encode().map_err(|e| {
+                KalaError::serialization(format!("Failed to encode batch data: {}", e))
+            })?;
             batch.put(formatted_key.as_bytes(), &encoded);
         }
 
-        self.db
-            .write(batch)
-            .map_err(KalaError::from)
+        self.db.write(batch).map_err(KalaError::from)
     }
 }
 
@@ -261,7 +256,11 @@ impl DatabaseUtils {
     pub fn restore_database(backup_path: &str, restore_path: &str) -> KalaResult<()> {
         // This would require additional rocksdb backup functionality
         // For now, just return success
-        tracing::info!("Database restore requested from: {} to: {}", backup_path, restore_path);
+        tracing::info!(
+            "Database restore requested from: {} to: {}",
+            backup_path,
+            restore_path
+        );
         Ok(())
     }
 }
@@ -269,9 +268,9 @@ impl DatabaseUtils {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::prelude::EncodingType;
+    use serde::{Deserialize, Serialize};
     use tempfile::tempdir;
-    use serde::{Serialize, Deserialize};
-
     #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
     struct TestData {
         id: u64,
@@ -319,16 +318,38 @@ mod tests {
         let db = KalaDatabase::new(db_path.to_str().unwrap()).unwrap();
 
         let operations = vec![
-            ("test".to_string(), "key1".to_string(), TestData { id: 1, name: "one".to_string() }),
-            ("test".to_string(), "key2".to_string(), TestData { id: 2, name: "two".to_string() }),
-            ("test".to_string(), "key3".to_string(), TestData { id: 3, name: "three".to_string() }),
+            (
+                "test".to_string(),
+                "key1".to_string(),
+                TestData {
+                    id: 1,
+                    name: "one".to_string(),
+                },
+            ),
+            (
+                "test".to_string(),
+                "key2".to_string(),
+                TestData {
+                    id: 2,
+                    name: "two".to_string(),
+                },
+            ),
+            (
+                "test".to_string(),
+                "key3".to_string(),
+                TestData {
+                    id: 3,
+                    name: "three".to_string(),
+                },
+            ),
         ];
 
         db.batch_store(operations).await.unwrap();
 
         // Verify all data was stored
         for i in 1..=3 {
-            let loaded: Option<TestData> = db.load_data("test", &format!("key{}", i)).await.unwrap();
+            let loaded: Option<TestData> =
+                db.load_data("test", &format!("key{}", i)).await.unwrap();
             assert!(loaded.is_some());
             assert_eq!(loaded.unwrap().id, i as u64);
         }
@@ -340,7 +361,10 @@ mod tests {
         let db_path = temp_dir.path().join("prefix_test_db");
         let db = KalaDatabase::new(db_path.to_str().unwrap()).unwrap();
 
-        let test_data = TestData { id: 1, name: "test".to_string() };
+        let test_data = TestData {
+            id: 1,
+            name: "test".to_string(),
+        };
 
         // Store data with different prefixes
         db.store_data("prefix1", "key1", &test_data).await.unwrap();

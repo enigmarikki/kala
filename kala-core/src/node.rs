@@ -523,7 +523,8 @@ impl KalaApiServer for KalaRpcHandler {
                 jsonrpsee::types::error::INTERNAL_ERROR_CODE,
                 e.to_string(),
                 None::<()>,
-            ).into())
+            )
+            .into()),
         }
     }
 
@@ -537,7 +538,8 @@ impl KalaApiServer for KalaRpcHandler {
                 jsonrpsee::types::error::INTERNAL_ERROR_CODE,
                 e.to_string(),
                 None::<()>,
-            ).into())
+            )
+            .into()),
         }
     }
 
@@ -568,11 +570,14 @@ impl KalaApiServer for KalaRpcHandler {
         // Load current state from DB
         let state = match self.state_db.load_chain_state().await {
             Ok(state) => state,
-            Err(e) => return Err(jsonrpsee::types::error::ErrorObject::owned(
-                jsonrpsee::types::error::INTERNAL_ERROR_CODE,
-                e.to_string(),
-                None::<()>,
-            ).into())
+            Err(e) => {
+                return Err(jsonrpsee::types::error::ErrorObject::owned(
+                    jsonrpsee::types::error::INTERNAL_ERROR_CODE,
+                    e.to_string(),
+                    None::<()>,
+                )
+                .into())
+            }
         };
 
         Ok(state.get_account(&address).map(|account| AccountInfo {

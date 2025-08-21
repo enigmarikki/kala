@@ -35,7 +35,7 @@
 //! // Get chain information
 //! {
 //!   \"jsonrpc\": \"2.0\",
-//!   \"method\": \"kala_chainInfo\", 
+//!   \"method\": \"kala_chainInfo\",
 //!   \"id\": 1
 //! }
 //!
@@ -57,9 +57,9 @@
 //! - Rate limiting should be implemented at the HTTP layer
 //! - HTTPS is recommended for production deployments
 
+use jsonrpsee::{core::RpcResult, proc_macros::rpc, server::ServerBuilder};
 use kala_common::prelude::*;
 use kala_common::types::PublicKey;
-use jsonrpsee::{core::RpcResult, proc_macros::rpc, server::ServerBuilder};
 use kala_state::TickCertificate;
 use std::net::SocketAddr;
 
@@ -92,7 +92,7 @@ pub struct ChainInfo {
 #[derive(Serialize, Deserialize, Clone)]
 pub struct SubmitTransactionRequest {
     /// Hex-encoded timelock-encrypted transaction data
-    /// 
+    ///
     /// This contains the complete [`TimelockTransaction`] structure
     /// serialized and encoded as a hex string for safe transport.
     pub encrypted_tx: String,
@@ -299,7 +299,7 @@ pub trait KalaApi {
     /// ```json
     /// {
     ///   "jsonrpc": "2.0",
-    ///   "method": "kala_getAccount", 
+    ///   "method": "kala_getAccount",
     ///   "params": {
     ///     "address": "0x1234567890abcdef1234567890abcdef12345678"
     ///   },
@@ -358,10 +358,13 @@ pub struct RpcConfig {
 /// # }
 /// ```
 pub async fn start_server<T: KalaApiServer>(config: RpcConfig, api_impl: T) -> KalaResult<()> {
-    let server = ServerBuilder::default().build(config.listen_addr).await
+    let server = ServerBuilder::default()
+        .build(config.listen_addr)
+        .await
         .map_err(|e| KalaError::network(format!("Failed to build server: {}", e)))?;
 
-    let addr = server.local_addr()
+    let addr = server
+        .local_addr()
         .map_err(|e| KalaError::network(format!("Failed to get local address: {}", e)))?;
     let handle = server.start(api_impl.into_rpc());
 
@@ -448,12 +451,14 @@ impl SubmitTransactionRequest {
     /// ```
     pub fn validate(&self) -> KalaResult<()> {
         if self.encrypted_tx.is_empty() {
-            return Err(KalaError::validation("Encrypted transaction cannot be empty"));
+            return Err(KalaError::validation(
+                "Encrypted transaction cannot be empty",
+            ));
         }
-        
+
         hex::decode(&self.encrypted_tx)
             .map_err(|_| KalaError::validation("Invalid hex encoding in encrypted_tx"))?;
-            
+
         Ok(())
     }
 }

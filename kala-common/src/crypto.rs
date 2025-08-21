@@ -1,14 +1,14 @@
 //! Cryptographic utilities and hash operations
 
-use sha2::{Digest, Sha256};
 use crate::{
-    types::{Hash, PublicKey, Signature, HashExt, PublicKeyExt, SignatureExt}, 
-    error::KalaResult
+    error::KalaResult,
+    types::{Hash, HashExt, PublicKey, PublicKeyExt, Signature, SignatureExt},
 };
+use sha2::{Digest, Sha256};
 
 /// Cryptographic constants
 pub const HASH_SIZE: usize = 32;
-pub const PUBKEY_SIZE: usize = 32;  
+pub const PUBKEY_SIZE: usize = 32;
 pub const SIGNATURE_SIZE: usize = 64;
 
 /// Central cryptographic utilities
@@ -66,14 +66,16 @@ impl CryptoUtils {
     /// Convert hex string to hash
     pub fn hex_to_hash(hex_str: &str) -> KalaResult<Hash> {
         if hex_str.len() != HASH_SIZE * 2 {
-            return Err(crate::error::KalaError::validation(
-                format!("Invalid hash length: expected {}, got {}", HASH_SIZE * 2, hex_str.len())
-            ));
+            return Err(crate::error::KalaError::validation(format!(
+                "Invalid hash length: expected {}, got {}",
+                HASH_SIZE * 2,
+                hex_str.len()
+            )));
         }
 
         let bytes = hex::decode(hex_str)
             .map_err(|e| crate::error::KalaError::validation(format!("Invalid hex: {}", e)))?;
-        
+
         let mut hash = [0u8; HASH_SIZE];
         hash.copy_from_slice(&bytes);
         Ok(hash)
@@ -107,7 +109,7 @@ impl MerkleTree {
         // Build tree bottom-up
         while current_level > 1 {
             let mut next_level = Vec::new();
-            
+
             for i in (0..current_level).step_by(2) {
                 let left = nodes[i];
                 let right = if i + 1 < current_level {
@@ -115,11 +117,11 @@ impl MerkleTree {
                 } else {
                     left // Duplicate if odd number
                 };
-                
+
                 let parent = CryptoUtils::hash_multiple(&[&left, &right]);
                 next_level.push(parent);
             }
-            
+
             nodes.extend_from_slice(&next_level);
             current_level = next_level.len();
         }
@@ -190,17 +192,17 @@ mod tests {
         let hash1 = CryptoUtils::hash(data);
         let hash2 = CryptoUtils::hash(data);
         assert_eq!(hash1, hash2);
-        assert_ne!(hash1, Hash::zero());
+        assert_ne!(hash1, [0u8; 32]);
     }
 
     #[test]
     fn test_hash_chain() {
         let data1 = b"first";
         let data2 = b"second";
-        
+
         let hash1 = CryptoUtils::hash(data1);
         let chain_hash = CryptoUtils::hash_chain(&hash1, data2);
-        
+
         let expected = CryptoUtils::hash_multiple(&[&hash1, data2]);
         assert_eq!(chain_hash, expected);
     }
