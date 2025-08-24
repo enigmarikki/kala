@@ -189,8 +189,8 @@ impl TickProcessor {
     ///     encrypted_txs
     /// ).await?;
     ///
-    /// println!(\"Processed tick {} with {} transactions\", 
-    ///          certificate.tick_number, 
+    /// println!(\"Processed tick {} with {} transactions\",
+    ///          certificate.tick_number,
     ///          certificate.transaction_count);
     /// # Ok(())
     /// # }
@@ -705,7 +705,7 @@ impl TickProcessor {
 /// use sha2::{Digest, Sha256};
 ///
 /// let hash1 = Sha256::digest(b"transaction1").into();
-/// let hash2 = Sha256::digest(b"transaction2").into(); 
+/// let hash2 = Sha256::digest(b"transaction2").into();
 /// let hashes = [hash1, hash2];
 ///
 /// let root = compute_merkle_root(&hashes);

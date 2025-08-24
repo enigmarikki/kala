@@ -67,7 +67,7 @@ pub use node::KalaNode;
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 
 // Constants now provided by kala-common
-pub use kala_common::types::consensus::{DEFAULT_DISCRIMINANT, DEFAULT_ITERATIONS_PER_TICK, DEFAULT_TICK_DURATION_MS};
+pub use kala_common::types::consensus::{DEFAULT_DISCRIMINANT, DEFAULT_ITERATIONS_PER_TICK};
 
 #[cfg(test)]
 mod tests {
@@ -76,7 +76,6 @@ mod tests {
     #[test]
     fn test_constants() {
         assert_eq!(DEFAULT_ITERATIONS_PER_TICK, 65536);
-        assert_eq!(DEFAULT_TICK_DURATION_MS, 497);
         assert!(!DEFAULT_DISCRIMINANT.is_empty());
     }
 }

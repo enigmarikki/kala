@@ -9,7 +9,7 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use tokio::sync::RwLock;
 use tracing::{debug, warn};
 
-use crate::serialization::{KalaSerialize, NetworkMessage, EncodingType};
+use crate::serialization::{EncodingType, KalaSerialize, NetworkMessage};
 
 /// Network protocol version
 pub const PROTOCOL_VERSION: u32 = 1;
@@ -26,20 +26,20 @@ pub enum MessageType {
     // VDF-related messages
     VDFCheckpoint,
     TickCertificate,
-    
+
     // Transaction messages
     TimelockTransaction,
     TransactionBatch,
-    
+
     // State synchronization
     StateRequest,
     StateResponse,
-    
+
     // Peer discovery and health
     Ping,
     Pong,
     PeerDiscovery,
-    
+
     // Custom message types
     Custom(String),
 }
@@ -48,7 +48,7 @@ impl MessageType {
     pub fn as_str(&self) -> &str {
         match self {
             Self::VDFCheckpoint => "vdf_checkpoint",
-            Self::TickCertificate => "tick_certificate", 
+            Self::TickCertificate => "tick_certificate",
             Self::TimelockTransaction => "timelock_transaction",
             Self::TransactionBatch => "transaction_batch",
             Self::StateRequest => "state_request",
@@ -127,7 +127,7 @@ pub trait MessageHandler: Send + Sync {
         message: &NetworkMessage,
         sender: &NodeId,
     ) -> Result<Option<NetworkMessage>>;
-    
+
     fn supported_message_types(&self) -> Vec<MessageType>;
 }
 
@@ -152,7 +152,7 @@ impl NetworkLayer {
             start_time: SystemTime::now(),
         }
     }
-    
+
     /// Register a message handler for specific message types
     pub async fn register_handler(&self, handler: Arc<dyn MessageHandler>) {
         let mut handlers = self.handlers.write().await;
@@ -160,7 +160,7 @@ impl NetworkLayer {
             handlers.insert(msg_type.as_str().to_string(), handler.clone());
         }
     }
-    
+
     /// Send a message to a specific peer
     pub async fn send_to_peer<T: KalaSerialize>(
         &self,
@@ -168,24 +168,24 @@ impl NetworkLayer {
         message_type: MessageType,
         payload: &T,
     ) -> Result<()> {
-        let message = NetworkMessage::new(
-            message_type.as_str(),
-            payload,
-            Some(self.node_id),
-        )?;
-        
+        let message = NetworkMessage::new(message_type.as_str(), payload, Some(self.node_id))?;
+
         // Update statistics
         let mut stats = self.stats.write().await;
         let msg_type_str = message_type.as_str().to_string();
         *stats.messages_sent.entry(msg_type_str).or_insert(0) += 1;
         stats.bytes_sent += message.payload.len() as u64;
-        
+
         // TODO: Implement actual network sending
-        debug!("Sending {} message to peer {:?}", message_type.as_str(), peer_id);
-        
+        debug!(
+            "Sending {} message to peer {:?}",
+            message_type.as_str(),
+            peer_id
+        );
+
         Ok(())
     }
-    
+
     /// Broadcast a message to all connected peers
     pub async fn broadcast<T: KalaSerialize>(
         &self,
@@ -198,18 +198,21 @@ impl NetworkLayer {
             .filter(|(_, info)| info.connected)
             .map(|(id, _)| *id)
             .collect();
-        
+
         drop(peers);
-        
+
         for peer_id in connected_peers {
-            if let Err(e) = self.send_to_peer(&peer_id, message_type.clone(), payload).await {
+            if let Err(e) = self
+                .send_to_peer(&peer_id, message_type.clone(), payload)
+                .await
+            {
                 warn!("Failed to send message to peer {:?}: {}", peer_id, e);
             }
         }
-        
+
         Ok(())
     }
-    
+
     /// Process an incoming message
     pub async fn handle_incoming_message(
         &self,
@@ -222,13 +225,13 @@ impl NetworkLayer {
         *stats.messages_received.entry(msg_type.clone()).or_insert(0) += 1;
         stats.bytes_received += message.payload.len() as u64;
         drop(stats);
-        
+
         // Find appropriate handler
         let handlers = self.handlers.read().await;
         if let Some(handler) = handlers.get(&msg_type) {
             let handler = handler.clone();
             drop(handlers);
-            
+
             match handler.handle_message(&message, sender).await {
                 Ok(Some(_response)) => {
                     // Send response back to sender
@@ -245,77 +248,73 @@ impl NetworkLayer {
         } else {
             warn!("No handler registered for message type: {}", msg_type);
         }
-        
+
         Ok(())
     }
-    
+
     /// Add or update peer information
     pub async fn update_peer(&self, peer_info: PeerInfo) {
         let mut peers = self.peers.write().await;
         peers.insert(peer_info.id, peer_info);
-        
+
         // Update peer count in stats
         let mut stats = self.stats.write().await;
         stats.peer_count = peers.len();
     }
-    
+
     /// Remove a peer
     pub async fn remove_peer(&self, peer_id: &NodeId) {
         let mut peers = self.peers.write().await;
         peers.remove(peer_id);
-        
+
         // Update stats
         let mut stats = self.stats.write().await;
         stats.peer_count = peers.len();
         stats.connections_dropped += 1;
     }
-    
+
     /// Get current network statistics
     pub async fn get_stats(&self) -> NetworkStats {
         let mut stats = self.stats.read().await.clone();
-        
+
         // Update uptime
-        stats.uptime_seconds = self.start_time
+        stats.uptime_seconds = self
+            .start_time
             .elapsed()
             .unwrap_or(Duration::ZERO)
             .as_secs();
-        
+
         stats
     }
-    
+
     /// Get list of connected peers
     pub async fn get_peers(&self) -> Vec<PeerInfo> {
-        self.peers
-            .read()
-            .await
-            .values()
-            .cloned()
-            .collect()
+        self.peers.read().await.values().cloned().collect()
     }
-    
+
     /// Start periodic maintenance tasks
     pub async fn start_maintenance(&self) {
         let peers = self.peers.clone();
         let config = self.config.clone();
-        
+
         tokio::spawn(async move {
             let mut interval = tokio::time::interval(config.keepalive_interval);
-            
+
             loop {
                 interval.tick().await;
-                
+
                 // Clean up disconnected peers
                 let mut peers_write = peers.write().await;
                 let now = SystemTime::now()
                     .duration_since(UNIX_EPOCH)
                     .unwrap_or(Duration::ZERO)
                     .as_secs();
-                
+
                 peers_write.retain(|_, peer| {
                     let age = now.saturating_sub(peer.last_seen);
                     age < config.connection_timeout.as_secs()
                 });
-                
+
                 debug!("Network maintenance: {} active peers", peers_write.len());
             }
         });
@@ -371,7 +370,7 @@ impl MessageHandler for PingPongHandler {
         match message.message_type.as_str() {
             "ping" => {
                 let ping: PingMessage = message.decode_payload()?;
-                
+
                 let pong = PongMessage {
                     timestamp: SystemTime::now()
                         .duration_since(UNIX_EPOCH)
@@ -380,7 +379,7 @@ impl MessageHandler for PingPongHandler {
                     original_timestamp: ping.timestamp,
                     node_id: self.node_id,
                 };
-                
+
                 let response = NetworkMessage::new("pong", &pong, Some(self.node_id))?;
                 Ok(Some(response))
             }
@@ -389,10 +388,13 @@ impl MessageHandler for PingPongHandler {
                 debug!("Received pong from {:?}", sender);
                 Ok(None)
             }
-            _ => Err(anyhow!("Unsupported message type: {}", message.message_type))
+            _ => Err(anyhow!(
+                "Unsupported message type: {}",
+                message.message_type
+            )),
         }
     }
-    
+
     fn supported_message_types(&self) -> Vec<MessageType> {
         vec![MessageType::Ping, MessageType::Pong]
     }
@@ -401,34 +403,34 @@ impl MessageHandler for PingPongHandler {
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
     #[tokio::test]
     async fn test_network_layer_creation() {
         let config = NetworkConfig::default();
         let node_id = [0u8; 32];
         let network = NetworkLayer::new(config, node_id);
-        
+
         let stats = network.get_stats().await;
         assert_eq!(stats.peer_count, 0);
     }
-    
+
     #[tokio::test]
     async fn test_ping_pong_handler() {
         let node_id = [1u8; 32];
         let handler = PingPongHandler::new(node_id);
-        
+
         let ping = PingMessage {
             timestamp: 1234567890,
             node_id: [2u8; 32],
             protocol_version: PROTOCOL_VERSION,
         };
-        
+
         let ping_msg = NetworkMessage::new("ping", &ping, Some([2u8; 32])).unwrap();
         let sender = [2u8; 32];
-        
+
         let response = handler.handle_message(&ping_msg, &sender).await.unwrap();
         assert!(response.is_some());
-        
+
         if let Some(resp) = response {
             assert_eq!(resp.message_type, "pong");
         }

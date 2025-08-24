@@ -1,7 +1,6 @@
-use bincode::{Decode, Encode};
 use serde::{Deserialize, Serialize};
 
-#[derive(Serialize, Deserialize, Encode, Decode, Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct Account {
     pub balance: u64,
     pub nonce: u64,
@@ -20,7 +19,7 @@ impl Account {
     }
 }
 
-#[derive(Serialize, Deserialize, Encode, Decode, Clone)]
+#[derive(Serialize, Deserialize, Clone)]
 pub struct AccountState {
     pub address: [u8; 32],
     pub account: Account,

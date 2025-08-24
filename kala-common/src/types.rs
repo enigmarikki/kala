@@ -27,19 +27,19 @@ pub type Signature = [u8; 64];
 pub mod sizes {
     /// Hash size in bytes (SHA-256)
     pub const HASH_SIZE: usize = 32;
-    
+
     /// Public key size in bytes
     pub const PUBKEY_SIZE: usize = 32;
-    
+
     /// Signature size in bytes
     pub const SIGNATURE_SIZE: usize = 64;
-    
+
     /// AES key size in bytes
     pub const AES_KEY_SIZE: usize = 32;
-    
+
     /// AES nonce size in bytes
     pub const NONCE_SIZE: usize = 12;
-    
+
     /// AES tag size in bytes  
     pub const TAG_SIZE: usize = 16;
 }
@@ -47,16 +47,16 @@ pub mod sizes {
 /// Network protocol constants
 pub mod network {
     use std::time::Duration;
-    
+
     /// Maximum message size (16MB)
     pub const MAX_MESSAGE_SIZE: usize = 16 * 1024 * 1024;
-    
+
     /// Default connection timeout
     pub const DEFAULT_CONNECTION_TIMEOUT: Duration = Duration::from_secs(30);
-    
+
     /// Default keepalive interval
     pub const DEFAULT_KEEPALIVE_INTERVAL: Duration = Duration::from_secs(60);
-    
+
     /// Default message buffer size
     pub const DEFAULT_MESSAGE_BUFFER_SIZE: usize = 1000;
 }
@@ -65,17 +65,15 @@ pub mod network {
 pub mod consensus {
     /// Default iterations per tick (k = 2^16)
     pub const DEFAULT_ITERATIONS_PER_TICK: u64 = 65536;
-    
-    /// Default tick duration in milliseconds (~497.7ms as measured)
-    pub const DEFAULT_TICK_DURATION_MS: u64 = 497;
-    
+
     /// VDF discriminant from the paper
     pub const DEFAULT_DISCRIMINANT: &str = "-141140317794792668862943332656856519378482291428727287413318722089216448567155737094768903643716404517549715385664163360316296284155310058980984373770517398492951860161717960368874227473669336541818575166839209228684755811071416376384551902149780184532086881683576071479646499601330824259260645952517205526679";
-    
+
     /// Tick phases
-    pub const COLLECTION_PHASE_RATIO: f64 = 1.0 / 3.0;  // k/3
-    pub const CONSENSUS_PHASE_RATIO: f64 = 2.0 / 3.0;   // 2k/3
-    pub const FINALIZATION_PHASE_RATIO: f64 = 1.0;      // k
+    /// TODO: Profile this properly
+    pub const COLLECTION_PHASE_RATIO: f64 = 1.0 / 3.0; // k/3
+    pub const CONSENSUS_PHASE_RATIO: f64 = 2.0 / 3.0; // 2k/3
+    pub const FINALIZATION_PHASE_RATIO: f64 = 1.0; // k
 }
 
 /// Database constants
@@ -93,7 +91,6 @@ pub mod database {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct KalaDefaults {
     pub iterations_per_tick: u64,
-    pub tick_duration_ms: u64,
     pub max_peers: usize,
     pub rpc_port: u16,
     pub network_port: u16,
@@ -103,7 +100,6 @@ impl Default for KalaDefaults {
     fn default() -> Self {
         Self {
             iterations_per_tick: consensus::DEFAULT_ITERATIONS_PER_TICK,
-            tick_duration_ms: consensus::DEFAULT_TICK_DURATION_MS,
             max_peers: 100,
             rpc_port: 8545,
             network_port: 8080,
@@ -143,7 +139,7 @@ impl HashExt for Hash {
     fn zero() -> Self {
         [0u8; 32]
     }
-    
+
     fn is_zero(&self) -> bool {
         *self == [0u8; 32]
     }
@@ -160,7 +156,7 @@ impl PublicKeyExt for PublicKey {
     fn zero() -> Self {
         [0u8; 32]
     }
-    
+
     fn is_zero(&self) -> bool {
         *self == [0u8; 32]
     }
@@ -177,7 +173,7 @@ impl SignatureExt for Signature {
     fn zero() -> Self {
         [0u8; 64]
     }
-    
+
     fn is_zero(&self) -> bool {
         *self == [0u8; 64]
     }

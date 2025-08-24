@@ -30,53 +30,53 @@ use std::path::PathBuf;
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct NodeConfig {
     /// Path to the RocksDB state database directory
-    /// 
+    ///
     /// This directory stores the blockchain state, tick certificates,
     /// and VDF checkpoints. Created automatically if it doesn't exist.
     pub db_path: String,
 
     /// Port for the JSON-RPC API server
-    /// 
+    ///
     /// The RPC server provides external access to the blockchain,
     /// allowing clients to submit transactions and query state.
     /// Default: 8545 (Ethereum-compatible)
     pub rpc_port: u16,
 
     /// Number of VDF iterations per tick (k parameter from the paper)
-    /// 
+    ///
     /// This is the fundamental timing parameter that determines:
-    /// - Tick duration: k * 7.6μs (≈497ms for k=65536) 
+    /// - Tick duration: k * 7.6μs (≈497ms for k=65536)
     /// - Security level: Higher k = more security
     /// - Transaction finality time
-    /// 
+    ///
     /// Default: 65536 (2^16) as specified in the paper
     pub iterations_per_tick: u64,
 
     /// Timelock puzzle hardness factor (0.0 to 1.0)
-    /// 
+    ///
     /// Determines RSW timelock puzzle difficulty as a fraction of the
     /// tick duration. Higher values mean longer decryption times but
     /// better MEV protection. Must leave enough time for decryption
     /// and validation phases.
-    /// 
+    ///
     /// Default: 0.1 (10% of tick duration)
     pub timelock_hardness_factor: f64,
 
     /// Enable GPU acceleration for RSW puzzle solving
-    /// 
+    ///
     /// When enabled, uses CUDA acceleration for parallel timelock
     /// puzzle solving. Requires compatible GPU hardware and drivers.
     /// Falls back to CPU if GPU acceleration fails.
     pub enable_gpu: bool,
 
     /// Maximum number of transactions processed per tick
-    /// 
+    ///
     /// Limits the transaction throughput to prevent tick overruns.
     /// Transactions beyond this limit are deferred to future ticks.
     pub max_transactions_per_tick: usize,
 
     /// Network discriminant for VDF computation
-    /// 
+    ///
     /// This large negative integer parameter must be identical across
     /// all nodes in the network. It determines the VDF class group
     /// and ensures network consensus. Changing this creates a new
@@ -84,7 +84,7 @@ pub struct NodeConfig {
     pub discriminant: String,
 
     /// Logging verbosity level
-    /// 
+    ///
     /// Controls the amount of logging output. Levels:
     /// - "error": Only errors
     /// - "warn": Errors and warnings
@@ -94,13 +94,13 @@ pub struct NodeConfig {
     pub log_level: String,
 
     /// Enable Prometheus metrics collection
-    /// 
+    ///
     /// When enabled, exposes performance metrics on the metrics port
     /// for monitoring and observability. Useful for production deployments.
     pub enable_metrics: bool,
 
     /// Port for Prometheus metrics endpoint
-    /// 
+    ///
     /// HTTP endpoint serving metrics in Prometheus format.
     /// Only active when enable_metrics is true.
     pub metrics_port: u16,
@@ -108,18 +108,18 @@ pub struct NodeConfig {
 
 impl Default for NodeConfig {
     /// Creates a default configuration suitable for development and testing
-    /// 
+    ///
     /// The default configuration provides:
     /// - Local database in "./kala_db" directory
     /// - Standard Ethereum RPC port (8545)
     /// - Full security parameters (65536 iterations per tick)
     /// - Conservative timelock settings (10% hardness factor)
     /// - Network discriminant from the research paper
-    /// 
+    ///
     /// # Example
     /// ```
     /// use kala_core::NodeConfig;
-    /// 
+    ///
     /// let config = NodeConfig::default();
     /// config.validate().unwrap();
     /// ```
@@ -148,30 +148,30 @@ impl Default for NodeConfig {
 
 impl NodeConfig {
     /// Validates the configuration parameters
-    /// 
+    ///
     /// Performs comprehensive validation of all configuration parameters
     /// to ensure they are within acceptable ranges and compatible with
     /// each other.
-    /// 
+    ///
     /// # Validation Rules
-    /// 
+    ///
     /// - `iterations_per_tick` must be greater than 0
     /// - `timelock_hardness_factor` must be between 0.0 and 1.0
     /// - `discriminant` must not be empty
-    /// 
+    ///
     /// # Returns
-    /// 
+    ///
     /// - `Ok(())` if all parameters are valid
     /// - `Err(description)` with details of the first validation failure
-    /// 
+    ///
     /// # Example
-    /// 
+    ///
     /// ```
     /// use kala_core::NodeConfig;
-    /// 
+    ///
     /// let mut config = NodeConfig::default();
     /// assert!(config.validate().is_ok());
-    /// 
+    ///
     /// // Invalid hardness factor
     /// config.timelock_hardness_factor = 1.5;
     /// assert!(config.validate().is_err());
@@ -193,15 +193,15 @@ impl NodeConfig {
     }
 
     /// Returns the database path as a [`PathBuf`]
-    /// 
+    ///
     /// Convenience method for working with filesystem operations.
     /// The path is created automatically if it doesn't exist.
-    /// 
+    ///
     /// # Example
     /// ```
     /// use kala_core::NodeConfig;
     /// use std::path::Path;
-    /// 
+    ///
     /// let config = NodeConfig::default();
     /// let path = config.db_path();
     /// assert_eq!(path, Path::new("./kala_db"));
@@ -211,33 +211,33 @@ impl NodeConfig {
     }
 
     /// Calculate appropriate timelock hardness for the current position in a tick
-    /// 
+    ///
     /// Dynamically adjusts timelock puzzle difficulty based on how much time
     /// remains in the current tick. This ensures transactions have sufficient
     /// time to decrypt and be processed.
-    /// 
+    ///
     /// # Parameters
-    /// 
+    ///
     /// - `remaining_iterations`: VDF iterations left until tick boundary
-    /// 
+    ///
     /// # Returns
-    /// 
+    ///
     /// The recommended timelock hardness (number of iterations) that:
     /// - Respects the configured hardness factor
     /// - Ensures decryption completes before tick end
     /// - Provides at least 1 iteration of hardness
-    /// 
+    ///
     /// # Algorithm
-    /// 
+    ///
     /// The hardness is the minimum of:
     /// 1. Maximum hardness: `iterations_per_tick * hardness_factor`
     /// 2. Safe hardness: `remaining_iterations / 2` (leaves time for processing)
     /// 3. At least 1 iteration minimum
-    /// 
+    ///
     /// # Example
     /// ```
     /// use kala_core::NodeConfig;
-    /// 
+    ///
     /// let config = NodeConfig::default();
     /// // With default 10% hardness factor and 65536 iterations per tick
     /// let hardness = config.calculate_timelock_hardness(32768);
@@ -272,22 +272,22 @@ mod tests {
     #[test]
     fn test_validation_timelock_hardness_factor() {
         let mut config = NodeConfig::default();
-        
+
         // Test lower bound
         config.timelock_hardness_factor = -0.1;
         assert!(config.validate().is_err());
-        
+
         // Test upper bound
         config.timelock_hardness_factor = 1.5;
         assert!(config.validate().is_err());
-        
+
         // Test valid values
         config.timelock_hardness_factor = 0.0;
         assert!(config.validate().is_ok());
-        
+
         config.timelock_hardness_factor = 1.0;
         assert!(config.validate().is_ok());
-        
+
         config.timelock_hardness_factor = 0.5;
         assert!(config.validate().is_ok());
     }
@@ -334,7 +334,7 @@ mod tests {
         let config = NodeConfig::default();
         let serialized = serde_json::to_string(&config).unwrap();
         let deserialized: NodeConfig = serde_json::from_str(&serialized).unwrap();
-        
+
         assert_eq!(config.db_path, deserialized.db_path);
         assert_eq!(config.rpc_port, deserialized.rpc_port);
         assert_eq!(config.iterations_per_tick, deserialized.iterations_per_tick);

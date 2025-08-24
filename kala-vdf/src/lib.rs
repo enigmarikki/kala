@@ -1,4 +1,3 @@
-use bincode::{Decode, Encode};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::collections::HashMap;
@@ -23,7 +22,7 @@ unsafe impl Send for VdfInternals {}
 unsafe impl Sync for VdfInternals {}
 
 /// Represents data timestamped at a specific iteration
-#[derive(Clone, Debug, Serialize, Deserialize, Encode, Decode)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct TimestampedData {
     pub iteration: u64,
     pub data: Vec<u8>,
@@ -31,7 +30,7 @@ pub struct TimestampedData {
 }
 
 /// Merkle tree node for efficient proofs
-#[derive(Clone, Debug, Serialize, Deserialize, Encode, Decode)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct MerkleNode {
     pub left: [u8; 32],
     pub right: [u8; 32],
@@ -39,7 +38,7 @@ pub struct MerkleNode {
 }
 
 /// Tick certificate - stored every k iterations
-#[derive(Clone, Debug, Serialize, Deserialize, Encode, Decode)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct TickCertificate {
     pub tick_number: u64,     // i = iteration / k
     pub start_iteration: u64, // i * k
@@ -387,7 +386,7 @@ impl EternalVDF {
 }
 
 /// Checkpoint structure for persistence
-#[derive(Serialize, Deserialize, Clone, Encode, Decode)]
+#[derive(Serialize, Deserialize, Clone)]
 pub struct VDFCheckpoint {
     pub iteration: u64,
     pub form_a: String,
@@ -400,7 +399,7 @@ pub struct VDFCheckpoint {
 }
 
 /// Timestamp proof that can be verified efficiently
-#[derive(Serialize, Deserialize, Clone, Debug, Encode, Decode)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct TimestampProof {
     pub iteration: u64,
     pub tick_number: u64,
