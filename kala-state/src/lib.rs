@@ -62,7 +62,6 @@
 //! # }
 //! ```
 
-use bincode::{Decode, Encode};
 use kala_common::prelude::*;
 use kala_common::types::Hash;
 use kala_vdf::{TickCertificate as VDFTickCertificate, VDFCheckpoint};
@@ -76,7 +75,7 @@ pub use account::{Account, AccountState};
 pub use tick::{TickCertificate, TickType};
 
 /// Global chain state using kala-common types
-#[derive(Serialize, Deserialize, Encode, Decode, Clone)]
+#[derive(Serialize, Deserialize, Clone)]
 pub struct ChainState {
     pub current_tick: BlockHeight,
     pub current_iteration: IterationNumber,
@@ -88,7 +87,7 @@ pub struct ChainState {
     puzzles: HashMap<Hash, PuzzleState>,
 }
 
-#[derive(Serialize, Deserialize, Encode, Decode, Clone)]
+#[derive(Serialize, Deserialize, Clone)]
 pub struct PuzzleState {
     pub solver: Hash,
     pub solution_proof: Vec<u8>,
