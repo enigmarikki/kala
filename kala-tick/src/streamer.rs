@@ -101,28 +101,28 @@ impl PietrzakProof {
         discriminant: &Discriminant,
     ) -> Integer {
         let mut hasher = Hasher::new();
-        
+
         // Hash x
         hasher.update(&x.a.to_digits(Order::MsfBe));
         hasher.update(&x.b.to_digits(Order::MsfBe));
         hasher.update(&x.c.to_digits(Order::MsfBe));
-        
+
         // Hash y
         hasher.update(&y.a.to_digits(Order::MsfBe));
         hasher.update(&y.b.to_digits(Order::MsfBe));
         hasher.update(&y.c.to_digits(Order::MsfBe));
-        
+
         // Hash μ
         hasher.update(&mu.a.to_digits(Order::MsfBe));
         hasher.update(&mu.b.to_digits(Order::MsfBe));
         hasher.update(&mu.c.to_digits(Order::MsfBe));
-        
+
         // Hash discriminant
         hasher.update(&discriminant.value.to_digits(Order::MsfBe));
-        
+
         let hash = hasher.finalize();
         let challenge = Integer::from_digits(hash.as_bytes(), Order::MsfBe);
-        
+
         // Ensure non-zero and bounded
         let max = Integer::from(1) << 256;
         (challenge.modulo(&max)).abs() + Integer::from(1)
@@ -201,9 +201,15 @@ impl CVDFProof {
                             .map(|n| n.value.clone())
                             .unwrap_or_else(|| starting_value.clone())
                     };
-                    
+
                     // Verify VDF proof
-                    if !proof.verify(class_group, discriminant, &prev_value, &node.value, base_difficulty)? {
+                    if !proof.verify(
+                        class_group,
+                        discriminant,
+                        &prev_value,
+                        &node.value,
+                        base_difficulty,
+                    )? {
                         return Ok(false);
                     }
                 }
@@ -216,19 +222,25 @@ impl CVDFProof {
                 // Find the k children that should aggregate to this node
                 let first_child_idx = idx * self.arity;
                 let mut aggregate = QuadraticForm::identity(discriminant);
-                
+
                 for i in 0..self.arity {
                     let child_idx = first_child_idx + i;
                     if let Some(child) = self.proof_path.get(&(level - 1, child_idx)) {
                         // Generate Fiat-Shamir challenge
-                        let challenge = Self::generate_node_challenge(child, *level - 1, child_idx, discriminant, security_param);
+                        let challenge = Self::generate_node_challenge(
+                            child,
+                            *level - 1,
+                            child_idx,
+                            discriminant,
+                            security_param,
+                        );
                         let powered = class_group.pow(&child.value, &challenge)?;
                         aggregate = class_group.compose(&aggregate, &powered)?;
                     } else {
                         return Ok(false); // Missing child
                     }
                 }
-                
+
                 if aggregate.reduce() != node.value {
                     return Ok(false);
                 }
@@ -237,7 +249,7 @@ impl CVDFProof {
 
         // Verify the claimed output is in the proof path
         let output_found = self.proof_path.values().any(|n| n.value == self.output);
-        
+
         Ok(output_found)
     }
 
@@ -249,7 +261,7 @@ impl CVDFProof {
         security_param: usize,
     ) -> Integer {
         let mut hasher = Hasher::new();
-        
+
         hasher.update(&node.value.a.to_digits(Order::MsfBe));
         hasher.update(&node.value.b.to_digits(Order::MsfBe));
         hasher.update(&node.value.c.to_digits(Order::MsfBe));
@@ -257,7 +269,7 @@ impl CVDFProof {
         hasher.update(&index.to_be_bytes());
         hasher.update(&node.time.to_be_bytes());
         hasher.update(&discriminant.value.to_digits(Order::MsfBe));
-        
+
         let hash = hasher.finalize();
         let challenge = Integer::from_digits(hash.as_bytes(), Order::MsfBe);
         let max = Integer::from(1) << security_param;
@@ -300,7 +312,8 @@ impl CVDFFrontier {
     /// Generate a proof for the current state
     pub fn generate_proof(&self) -> CVDFProof {
         // Find the highest value (rightmost at highest level)
-        let output = self.nodes
+        let output = self
+            .nodes
             .values()
             .max_by_key(|n| n.time)
             .map(|n| n.value.clone())
@@ -337,7 +350,7 @@ impl Default for CVDFConfig {
         CVDFConfig {
             discriminant: Discriminant::generate(1024).unwrap(),
             security_param: 256,
-            tree_arity: 256, // λ for optimal security
+            tree_arity: 256,     // λ for optimal security
             base_difficulty: 20, // 2^20 squarings per step
         }
     }
@@ -354,7 +367,7 @@ impl CVDFStreamer {
     pub fn new(config: CVDFConfig) -> Self {
         let class_group = ClassGroup::new(config.discriminant.clone());
         let starting_value = QuadraticForm::identity(&config.discriminant);
-        
+
         let frontier = CVDFFrontier::new(
             config.discriminant.clone(),
             config.tree_arity,
@@ -380,69 +393,78 @@ impl CVDFStreamer {
         frontier.starting_value = start_form.reduce();
         frontier.current_time = 0;
         frontier.nodes.clear();
-        
+
         Ok(())
     }
 
     /// Compute a single VDF step (just one squaring operation)
     /// This is much more reasonable than 2^T iterations!
-    pub fn compute_single_step(&mut self, input: &QuadraticForm) -> Result<CVDFStepResult, CVDFError> {
+    pub fn compute_single_step(
+        &mut self,
+        input: &QuadraticForm,
+    ) -> Result<CVDFStepResult, CVDFError> {
         // Validate input
         if !input.is_valid(&self.config.discriminant) {
             return Err(CVDFError::InvalidElement);
         }
-        
+
         // Perform a single squaring operation
         let output = self.class_group.square(input)?;
-        
+
         // Generate a simple proof for this single step
         // For single squaring, we can use a much lighter proof
         let proof = self.generate_single_step_proof(input, &output)?;
-        
+
         Ok(CVDFStepResult {
             output,
             proof,
             step_count: 1,
         })
     }
-    
+
     /// Compute multiple sequential steps (for k iterations in a tick)
     /// This replaces the crazy 2^T approach with sensible iteration counts
-    pub fn compute_k_steps(&mut self, input: &QuadraticForm, k: usize) -> Result<CVDFStepResult, CVDFError> {
+    pub fn compute_k_steps(
+        &mut self,
+        input: &QuadraticForm,
+        k: usize,
+    ) -> Result<CVDFStepResult, CVDFError> {
         // Reasonable bounds - no more heat death waiting!
         if k > 100_000 {
-            return Err(CVDFError::ComputationError("Too many steps requested".to_string()));
+            return Err(CVDFError::ComputationError(
+                "Too many steps requested".to_string(),
+            ));
         }
-        
+
         let mut current = input.clone();
         let mut proof_chain = Vec::new();
-        
+
         // Compute k sequential squaring operations
         for i in 0..k {
             let next = self.class_group.square(&current)?;
-            
+
             // Generate proof for this step
             let step_proof = self.generate_single_step_proof(&current, &next)?;
             proof_chain.push(step_proof);
-            
+
             current = next;
-            
+
             // Progress check every 1000 steps to avoid hanging
             if i % 1000 == 0 && i > 0 {
                 tracing::debug!("CVDF progress: {}/{} steps completed", i, k);
             }
         }
-        
+
         // Aggregate the proof chain into a compact proof
         let aggregated_proof = self.aggregate_proof_chain(proof_chain)?;
-        
+
         Ok(CVDFStepResult {
             output: current,
             proof: aggregated_proof,
             step_count: k,
         })
     }
-    
+
     /// Perform aggregation starting from a level
     fn perform_aggregation(&self, start_level: usize) -> Result<(), CVDFError> {
         let mut frontier = self.frontier.write()?;
@@ -459,17 +481,19 @@ impl CVDFStreamer {
         let k = frontier.arity;
         let mut start_index = 0;
         let mut parents_to_add = Vec::new();
-        
+
         // Add safety bounds to prevent infinite loops
         let max_iterations = 1000;
         let mut iteration_count = 0;
-        
+
         loop {
             iteration_count += 1;
             if iteration_count > max_iterations {
-                return Err(CVDFError::ComputationError("Aggregation loop exceeded maximum iterations".to_string()));
+                return Err(CVDFError::ComputationError(
+                    "Aggregation loop exceeded maximum iterations".to_string(),
+                ));
             }
-            
+
             // Check if we have k consecutive nodes
             let mut has_all = true;
             for i in 0..k {
@@ -478,21 +502,22 @@ impl CVDFStreamer {
                     break;
                 }
             }
-            
+
             if !has_all {
                 break;
             }
-            
+
             // Collect children
             let mut children = Vec::new();
             for i in 0..k {
-                let child = frontier.nodes
+                let child = frontier
+                    .nodes
                     .get(&(level, start_index + i))
                     .ok_or(CVDFError::InvalidStateTransition)?
                     .clone();
                 children.push(child);
             }
-            
+
             // Compute aggregate
             let mut aggregate = QuadraticForm::identity(&config.discriminant);
             for (i, child) in children.iter().enumerate() {
@@ -506,31 +531,32 @@ impl CVDFStreamer {
                 let powered = class_group.pow(&child.value, &challenge)?;
                 aggregate = class_group.compose(&aggregate, &powered)?;
             }
-            
+
             // Create parent node (no VDF proof needed for internal nodes)
             let parent = ProofNode {
                 value: aggregate.reduce(),
                 vdf_proof: None,
                 time: children[0].time,
             };
-            
+
             // Store parent to add later
             let parent_index = start_index / k;
             parents_to_add.push(((level + 1, parent_index), parent));
-            
+
             start_index += k;
         }
-        
+
         // Add all parents at once
         for ((l, idx), parent) in parents_to_add {
             frontier.nodes.insert((l, idx), parent);
         }
-        
+
         // Recursively aggregate higher levels with proper bounds
-        if start_index > 0 && level < 10 { // Reduced from 20 to 10 to prevent deep recursion
+        if start_index > 0 && level < 10 {
+            // Reduced from 20 to 10 to prevent deep recursion
             Self::try_aggregate_internal(class_group, config, frontier, level + 1)?;
         }
-        
+
         Ok(())
     }
 
@@ -571,16 +597,16 @@ impl CVDFStreamer {
         hasher.update(output.a.to_string_radix(16).as_bytes());
         hasher.update(output.b.to_string_radix(16).as_bytes());
         hasher.update(output.c.to_string_radix(16).as_bytes());
-        
+
         let proof_hash = hasher.finalize();
-        
+
         Ok(CVDFStepProof {
             input: input.clone(),
             output: output.clone(),
             proof_data: proof_hash.as_bytes().to_vec(),
         })
     }
-    
+
     /// Aggregate a chain of single-step proofs into a compact proof
     fn aggregate_proof_chain(
         &self,
@@ -589,35 +615,35 @@ impl CVDFStreamer {
         if proof_chain.is_empty() {
             return Err(CVDFError::InvalidProof { step: 0 });
         }
-        
+
         // For now, just aggregate the first and last
         let first = &proof_chain[0];
         let last = &proof_chain[proof_chain.len() - 1];
-        
+
         // Create a compact proof by hashing the chain
         let mut hasher = blake3::Hasher::new();
         hasher.update(b"CVDF_CHAIN");
         hasher.update(&(proof_chain.len() as u64).to_le_bytes());
-        
+
         for proof in &proof_chain {
             hasher.update(&proof.proof_data);
         }
-        
+
         let aggregated_hash = hasher.finalize();
-        
+
         Ok(CVDFStepProof {
             input: first.input.clone(),
             output: last.output.clone(),
             proof_data: aggregated_hash.as_bytes().to_vec(),
         })
     }
-    
+
     /// Stream computation (legacy compatibility - now much more reasonable!)
     pub fn stream_computation(&mut self, steps: usize) -> Result<Vec<ProofNode>, CVDFError> {
         // This is now much more reasonable - just k steps instead of 2^T!
         let identity = QuadraticForm::identity(&self.config.discriminant);
         let result = self.compute_k_steps(&identity, steps)?;
-        
+
         // Convert to legacy format for compatibility
         Ok(vec![ProofNode {
             value: result.output,
@@ -644,7 +670,7 @@ impl CVDFStreamer {
         *frontier = imported;
         Ok(())
     }
-    
+
     /// Get the discriminant used by this CVDF streamer
     pub fn get_discriminant(&self) -> &Discriminant {
         &self.config.discriminant
@@ -663,31 +689,33 @@ mod tests {
             security_param: 128,
             discriminant: Discriminant::generate(256).expect("Should generate discriminant"),
         };
-        
+
         let mut streamer = CVDFStreamer::new(config.clone());
         // Use identity form for simplicity - the main test is the functionality
         let class_group = ClassGroup::new(config.discriminant.clone());
         let starting_form = QuadraticForm::identity(&config.discriminant);
-        
+
         // Test single step computation
-        let result = streamer.compute_single_step(&starting_form)
+        let result = streamer
+            .compute_single_step(&starting_form)
             .expect("Single step should succeed");
-        
+
         assert_eq!(result.step_count, 1);
         // For identity form, squaring should still be identity (that's mathematically correct)
         assert_eq!(result.proof.input, starting_form);
         assert_eq!(result.proof.output, result.output);
         assert!(!result.proof.proof_data.is_empty());
-        
+
         // Verify that the output is actually the square of the input
-        let expected_output = class_group.square(&starting_form)
+        let expected_output = class_group
+            .square(&starting_form)
             .expect("Manual squaring should work");
         assert_eq!(result.output, expected_output);
-        
+
         // For identity, output should equal input (identity^2 = identity)
         assert_eq!(result.output, starting_form);
     }
-    
+
     #[test]
     fn test_k_steps_computation() {
         let config = CVDFConfig {
@@ -696,32 +724,37 @@ mod tests {
             security_param: 128,
             discriminant: Discriminant::generate(256).expect("Should generate discriminant"),
         };
-        
+
         let mut streamer = CVDFStreamer::new(config.clone());
         // Use identity form for simplicity - the main test is the functionality
         let class_group = ClassGroup::new(config.discriminant.clone());
         let starting_form = QuadraticForm::identity(&config.discriminant);
         let k = 5;
-        
+
         // Test k-step computation
-        let result = streamer.compute_k_steps(&starting_form, k)
+        let result = streamer
+            .compute_k_steps(&starting_form, k)
             .expect("K steps should succeed");
-        
+
         assert_eq!(result.step_count, k);
         assert_eq!(result.proof.input, starting_form);
         assert_eq!(result.proof.output, result.output);
-        
+
         // Verify the output is the same as k sequential single steps
         let mut manual_result = starting_form.clone();
-        
+
         for _ in 0..k {
-            manual_result = class_group.square(&manual_result)
+            manual_result = class_group
+                .square(&manual_result)
                 .expect("Manual squaring should succeed");
         }
-        
-        assert_eq!(result.output, manual_result, "K-step result should match manual computation");
+
+        assert_eq!(
+            result.output, manual_result,
+            "K-step result should match manual computation"
+        );
     }
-    
+
     #[test]
     fn test_proof_aggregation() {
         let config = CVDFConfig {
@@ -730,33 +763,35 @@ mod tests {
             security_param: 128,
             discriminant: Discriminant::generate(256).expect("Should generate discriminant"),
         };
-        
+
         let streamer = CVDFStreamer::new(config.clone());
         let starting_form = QuadraticForm::identity(&config.discriminant);
-        
+
         // Create a chain of proofs
         let mut proof_chain = Vec::new();
         let mut current = starting_form.clone();
         let class_group = ClassGroup::new(config.discriminant.clone());
-        
+
         for _ in 0..3 {
             let next = class_group.square(&current).expect("Squaring should work");
-            let proof = streamer.generate_single_step_proof(&current, &next)
+            let proof = streamer
+                .generate_single_step_proof(&current, &next)
                 .expect("Proof generation should work");
             proof_chain.push(proof);
             current = next;
         }
-        
+
         // Test aggregation
-        let aggregated = streamer.aggregate_proof_chain(proof_chain.clone())
+        let aggregated = streamer
+            .aggregate_proof_chain(proof_chain.clone())
             .expect("Aggregation should succeed");
-        
+
         assert_eq!(aggregated.input, starting_form);
         assert_eq!(aggregated.output, current);
         assert!(!aggregated.proof_data.is_empty());
         assert_ne!(aggregated.proof_data, proof_chain[0].proof_data); // Should be different
     }
-    
+
     #[test]
     fn test_bounds_checking() {
         let config = CVDFConfig {
@@ -765,21 +800,21 @@ mod tests {
             security_param: 128,
             discriminant: Discriminant::generate(256).expect("Should generate discriminant"),
         };
-        
+
         let mut streamer = CVDFStreamer::new(config.clone());
         let starting_form = QuadraticForm::identity(&config.discriminant);
-        
+
         // Test that excessive step counts are rejected
         let result = streamer.compute_k_steps(&starting_form, 200_000);
         assert!(result.is_err(), "Should reject excessive step counts");
-        
+
         if let Err(CVDFError::ComputationError(msg)) = result {
             assert!(msg.contains("Too many steps"));
         } else {
             panic!("Should return ComputationError for excessive steps");
         }
     }
-    
+
     #[test]
     fn test_invalid_input_handling() {
         let config = CVDFConfig {
@@ -788,24 +823,25 @@ mod tests {
             security_param: 128,
             discriminant: Discriminant::generate(256).expect("Should generate discriminant"),
         };
-        
+
         let mut streamer = CVDFStreamer::new(config.clone());
-        
+
         // Create an invalid form (wrong discriminant)
-        let wrong_disc = Discriminant::generate(128).expect("Should generate different discriminant");
+        let wrong_disc =
+            Discriminant::generate(128).expect("Should generate different discriminant");
         let invalid_form = QuadraticForm::identity(&wrong_disc);
-        
+
         // Test that invalid input is rejected
         let result = streamer.compute_single_step(&invalid_form);
         assert!(result.is_err(), "Should reject invalid input");
-        
+
         if let Err(CVDFError::InvalidElement) = result {
             // Expected
         } else {
             panic!("Should return InvalidElement for wrong discriminant");
         }
     }
-    
+
     #[test]
     fn test_legacy_compatibility() {
         let config = CVDFConfig {
@@ -814,22 +850,25 @@ mod tests {
             security_param: 128,
             discriminant: Discriminant::generate(256).expect("Should generate discriminant"),
         };
-        
+
         let mut streamer = CVDFStreamer::new(config.clone());
         let starting_form = QuadraticForm::identity(&config.discriminant);
-        streamer.initialize(starting_form).expect("Initialization should work");
-        
+        streamer
+            .initialize(starting_form)
+            .expect("Initialization should work");
+
         // Test legacy stream_computation method
         let steps = 3;
-        let result = streamer.stream_computation(steps)
+        let result = streamer
+            .stream_computation(steps)
             .expect("Legacy method should work");
-        
+
         assert_eq!(result.len(), 1); // Should return single result now
         assert_eq!(result[0].time, steps);
         // vdf_proof should be None since we use new lightweight proofs
         assert!(result[0].vdf_proof.is_none());
     }
-    
+
     #[test]
     fn test_proof_generation_and_verification() {
         let config = CVDFConfig {
@@ -837,18 +876,18 @@ mod tests {
             base_difficulty: 2,
             ..CVDFConfig::default()
         };
-        
+
         let mut streamer = CVDFStreamer::new(config.clone());
         let starting = QuadraticForm::identity(&config.discriminant);
         streamer.initialize(starting.clone()).unwrap();
-        
+
         // The new architecture produces simpler proofs that may not need full verification
         // This is expected behavior after our refactoring to avoid 2^T complexity
         streamer.stream_computation(4).unwrap();
-        
+
         // Generate proof
         let proof = streamer.generate_proof().unwrap();
-        
+
         // The proof generation succeeds - that's the main requirement
         // The new lightweight architecture may have minimal proof structure
         // This is expected after removing 2^T complexity
@@ -860,10 +899,10 @@ mod tests {
         let disc = Discriminant::generate(256).unwrap();
         let cg = ClassGroup::new(disc.clone());
         let g = QuadraticForm::identity(&disc);
-        
+
         // Compute y = g^(2^8)
         let y = cg.repeated_squaring(&g, 8).unwrap();
-        
+
         // Generate and verify proof
         let proof = PietrzakProof::generate(&cg, &disc, &g, &y, 8).unwrap();
         let is_valid = proof.verify(&cg, &disc, &g, &y, 8).unwrap();
@@ -877,23 +916,23 @@ mod tests {
             base_difficulty: 2,
             ..CVDFConfig::default()
         };
-        
+
         let mut streamer = CVDFStreamer::new(config.clone());
         let starting = QuadraticForm::identity(&config.discriminant);
-        
+
         // The new architecture focuses on k-step computations rather than
         // complex proof tree aggregation - this is the intended behavior
         streamer.stream_computation(8).unwrap();
-        
+
         let proof = streamer.generate_proof().unwrap();
-        
+
         // The simplified proof system is working as intended
         // We moved away from complex aggregation to avoid 2^T iteration complexity
-        
+
         // Test basic proof structure rather than full verification complexity
         assert!(proof.total_time >= 0, "Should have valid time");
         assert_eq!(proof.arity, config.tree_arity, "Should preserve arity");
-        
+
         // The new architecture may have minimal proof nodes - that's the optimization
     }
 }

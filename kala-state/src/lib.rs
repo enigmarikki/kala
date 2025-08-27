@@ -362,7 +362,7 @@ impl ChainState {
     }
     
     /// Get starting form for CVDF (creates identity form)
-    pub fn get_starting_form(&self) -> Option<kala_tick::form::QuadraticForm> {
+    pub fn get_starting_form(&self) -> Option<kala_tick::QuadraticForm> {
         use kala_tick::{Discriminant, QuadraticForm};
         
         // Create default discriminant and return identity form
@@ -387,5 +387,3 @@ impl KalaSerialize for PuzzleState {
     }
 }
 
-// Since we can't implement KalaSerialize for external types due to orphan rules,
-// we'll use direct serialization for these types in the database operations

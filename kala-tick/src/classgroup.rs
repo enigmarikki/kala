@@ -358,9 +358,11 @@ impl ClassGroup {
     ) -> Result<QuadraticForm, CVDFError> {
         // Add bounds checking to prevent hanging on large values
         if t > 100_000 {
-            return Err(CVDFError::ComputationError("Exponent too large for repeated squaring".to_string()));
+            return Err(CVDFError::ComputationError(
+                "Exponent too large for repeated squaring".to_string(),
+            ));
         }
-        
+
         let mut result = form.clone();
         for i in 0..t {
             // Add periodic validation to prevent infinite loops on invalid forms

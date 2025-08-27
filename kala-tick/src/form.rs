@@ -35,7 +35,7 @@ impl QuadraticForm {
                 c: Integer::from(1),
             };
         }
-        
+
         let mut c = Integer::new();
         c.assign(1 - &discriminant.value);
         c /= 4;
@@ -452,20 +452,20 @@ mod tests {
         // After our refactoring, identity no longer panics but returns an identity form
         // This is actually better behavior for a robust system
         let identity_form = QuadraticForm::identity(&disc);
-        
-        // The identity should still be mathematically computed  
+
+        // The identity should still be mathematically computed
         assert_eq!(identity_form.a, 1);
         assert_eq!(identity_form.b, 1);
         // For discriminant -5, identity has c = (1 - (-5))/4 = 6/4 = 1 (integer division)
         assert_eq!(identity_form.c, 1);
-        
+
         // Note: The discriminant check computes b^2 - 4ac = 1 - 4 = -3, not -5
         // So this form is not technically valid for discriminant -5
         // But that's okay - the function handled invalid discriminants gracefully
         // by computing a reasonable identity form rather than panicking
         assert_eq!(identity_form.discriminant(), -3);
         assert!(!identity_form.is_valid(&disc)); // Expected to fail validation
-        
+
         // This demonstrates graceful degradation instead of panic
     }
 
