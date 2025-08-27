@@ -9,5 +9,5 @@ pub mod verifier;
 pub use classgroup::ClassGroup;
 pub use discriminant::Discriminant;
 pub use form::QuadraticForm;
-pub use streamer::{CVDFConfig, CVDFStreamer, CVDFProof, ProofNode, CVDFFrontier};
+pub use streamer::{CVDFConfig, CVDFStreamer, CVDFProof, CVDFStepResult, CVDFStepProof, ProofNode, CVDFFrontier};
 pub use types::{CVDFError, Result};
