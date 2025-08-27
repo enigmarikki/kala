@@ -15,7 +15,8 @@ use crate::serialization::{EncodingType, KalaSerialize, NetworkMessage};
 pub const PROTOCOL_VERSION: u32 = 1;
 
 /// Maximum message size (16MB)
-pub const MAX_MESSAGE_SIZE: usize = 16 * 1024 * 1024;
+/// Re-exported from [`crate::types::network`] to avoid duplication.
+pub use crate::types::network::MAX_MESSAGE_SIZE;
 
 /// Network node identifier
 pub type NodeId = [u8; 32];

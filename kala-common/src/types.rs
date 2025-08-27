@@ -128,53 +128,27 @@ impl VersionInfo {
 }
 
 /// Utility functions for common operations using extension traits
-pub trait HashExt {
-    /// Create a zero hash
-    fn zero() -> Self;
-    /// Check if hash is zero
-    fn is_zero(&self) -> bool;
+macro_rules! impl_byte_array_ext {
+    ($name:ident, $len:expr) => {
+        pub trait $name {
+            /// Create an array filled with zeros
+            fn zero() -> Self;
+            /// Check if every byte in the array is zero
+            fn is_zero(&self) -> bool;
+        }
+
+        impl $name for [u8; $len] {
+            fn zero() -> Self {
+                [0u8; $len]
+            }
+
+            fn is_zero(&self) -> bool {
+                self.iter().all(|&b| b == 0)
+            }
+        }
+    };
 }
 
-impl HashExt for Hash {
-    fn zero() -> Self {
-        [0u8; 32]
-    }
-
-    fn is_zero(&self) -> bool {
-        *self == [0u8; 32]
-    }
-}
-
-pub trait PublicKeyExt {
-    /// Create a zero public key
-    fn zero() -> Self;
-    /// Check if public key is zero
-    fn is_zero(&self) -> bool;
-}
-
-impl PublicKeyExt for PublicKey {
-    fn zero() -> Self {
-        [0u8; 32]
-    }
-
-    fn is_zero(&self) -> bool {
-        *self == [0u8; 32]
-    }
-}
-
-pub trait SignatureExt {
-    /// Create a zero signature
-    fn zero() -> Self;
-    /// Check if signature is zero
-    fn is_zero(&self) -> bool;
-}
-
-impl SignatureExt for Signature {
-    fn zero() -> Self {
-        [0u8; 64]
-    }
-
-    fn is_zero(&self) -> bool {
-        *self == [0u8; 64]
-    }
-}
+impl_byte_array_ext!(HashExt, 32);
+impl_byte_array_ext!(PublicKeyExt, 32);
+impl_byte_array_ext!(SignatureExt, 64);

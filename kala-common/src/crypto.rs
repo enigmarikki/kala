@@ -55,12 +55,12 @@ impl CryptoUtils {
 
     /// Validate public key format
     pub fn validate_pubkey(pubkey: &PublicKey) -> bool {
-        !PublicKeyExt::is_zero(pubkey) && pubkey.iter().any(|&b| b != 0)
+        !pubkey.is_zero()
     }
 
     /// Validate signature format
     pub fn validate_signature(signature: &Signature) -> bool {
-        !SignatureExt::is_zero(signature) && signature.iter().any(|&b| b != 0)
+        !signature.is_zero()
     }
 
     /// Convert hex string to hash
