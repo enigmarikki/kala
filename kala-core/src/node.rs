@@ -256,9 +256,8 @@ impl KalaNode {
                     // Store certificate in database
                     self.state_db.store_tick(&certificate).await?;
 
-                    // Update chain state
+                    // Update chain state (tick number is already incremented by consensus processor)
                     let mut state = self.state.write().await;
-                    state.current_tick = certificate.tick_number + 1;
                     state.last_tick_hash = certificate.tick_hash;
                     state.total_transactions += certificate.transaction_count as u64;
 
