@@ -24,7 +24,7 @@ repository.workspace = true
 [dependencies]
 # Internal Kala crates
 kala-common = { workspace = true }                         # Shared types and database utilities
-kala-vdf = { workspace = true }                            # VDF types for checkpoints
+kala-tick = { workspace = true }                            # VDF types for checkpoints
 
 # Database and persistence
 rocksdb = { workspace = true }                             # High-performance key-value store

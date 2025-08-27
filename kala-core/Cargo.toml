@@ -23,7 +23,7 @@ repository.workspace = true
 [dependencies]
 # Internal Kala crates - the modular architecture
 kala-common = { workspace = true }                         # Shared utilities and types
-kala-vdf = { workspace = true }                            # VDF implementations
+kala-tick = { workspace = true }                            # VDF implementations
 kala-state = { workspace = true }                          # State management
 kala-transaction = { workspace = true }                    # Transaction processing
 kala-rpc = { workspace = true }                            # JSON-RPC API server

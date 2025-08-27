@@ -371,5 +371,3 @@ impl KalaSerialize for PuzzleState {
     }
 }
 
-// Since we can't implement KalaSerialize for external types due to orphan rules,
-// we'll use direct serialization for these types in the database operations

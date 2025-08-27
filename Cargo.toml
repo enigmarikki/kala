@@ -17,14 +17,12 @@
 [workspace]
 resolver = "2"
 members = [
-    "tick/tick",                # VDF computation engine
     "timelocks/timelocks",      # RSW timelock puzzles for MEV mitigation
     "kala-common",              # Shared utilities and types
     "kala-core",                # Main blockchain node and consensus
     "kala-state",               # State management and accounts
     "kala-rpc",                 # JSON-RPC API server
     "kala-transaction",         # Transaction types and processing
-    "kala-vdf",                 # VDF implementations and utilities
     "kala-tick"                 # CVDF streamer to replace old tick
 ]
 
@@ -40,14 +38,12 @@ repository = "https://github.com/enigmarikki/kala"
 # This ensures version consistency across all crates and simplifies maintenance
 [workspace.dependencies]
 # Internal crates - VDF and cryptographic components
-tick = { path = "tick/tick" }                              # C++ VDF computation engine
 timelocks = { path = "timelocks/timelocks" }               # RSW timelock puzzles
 kala-common = { path = "kala-common" }                     # Shared utilities and types
 kala-core = { path = "kala-core" }                         # Main blockchain node
 kala-state = { path = "kala-state" }                       # State management
 kala-rpc = { path = "kala-rpc" }                           # JSON-RPC API
 kala-transaction = { path = "kala-transaction" }           # Transaction handling
-kala-vdf = { path = "kala-vdf" }                           # VDF utilities
 kala-tick = { path = "kala-tick"}                          # CVDF streamer to replace old tick
 
 # External dependencies - grouped by category

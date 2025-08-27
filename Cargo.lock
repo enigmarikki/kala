@@ -1182,8 +1182,8 @@ dependencies = [
  "kala-common",
  "kala-rpc",
  "kala-state",
+ "kala-tick",
  "kala-transaction",
- "kala-vdf",
  "num-bigint",
  "serde",
  "serde_json",
@@ -1219,7 +1219,7 @@ dependencies = [
  "anyhow",
  "bincode",
  "kala-common",
- "kala-vdf",
+ "kala-tick",
  "rocksdb",
  "serde",
  "serde_json",
@@ -1277,21 +1277,6 @@ dependencies = [
  "tokio",
  "tracing",
  "which",
-]
-
-[[package]]
-name = "kala-vdf"
-version = "0.0.2"
-dependencies = [
- "anyhow",
- "bincode",
- "bindgen",
- "hex",
- "kala-common",
- "serde",
- "sha2",
- "tick",
- "tracing",
 ]
 
 [[package]]
@@ -2185,15 +2170,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f60246a4944f24f6e018aa17cdeffb7818b76356965d03b07d6a9886e8962185"
 dependencies = [
  "cfg-if",
-]
-
-[[package]]
-name = "tick"
-version = "0.1.0"
-dependencies = [
- "bindgen",
- "gmp-mpfr-sys",
- "libc",
 ]
 
 [[package]]
