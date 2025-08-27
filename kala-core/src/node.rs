@@ -2,7 +2,7 @@ use anyhow::Result;
 use sha2::{Digest, Sha256};
 use std::sync::Arc;
 use tokio::sync::{mpsc, Mutex, RwLock};
-use tracing::{debug, error, info, warn};
+use tracing::{debug, error, info};
 
 use crate::config::NodeConfig;
 use crate::consensus::TickProcessor;
@@ -143,7 +143,7 @@ impl KalaNode {
 
                         let info = ChainInfo {
                             current_tick: state.current_tick,
-                            current_iteration: current_time,
+                            current_iteration: current_time as u64,
                             vdf_output: format!("CVDF-{} nodes, {} time", node_count, current_time),
                             hash_chain: "streaming".to_string(),
                             total_transactions: state.total_transactions,
@@ -178,7 +178,7 @@ impl KalaNode {
                         };
                         let acceptance_end = target_tick_start + ((k as f64 * TX_ACCEPTANCE_WINDOW_END) as u64);
 
-                        if current_iter < acceptance_start || current_iter > acceptance_end {
+                        if (current_iter as u64) < acceptance_start || (current_iter as u64) > acceptance_end {
                             let _ = reply_tx.send(Err(format!(
                                 "Outside acceptance window for tick {} (current iter: {}, window: {}-{})",
                                 tx.target_tick, current_iter, acceptance_start, acceptance_end
@@ -187,7 +187,7 @@ impl KalaNode {
                         }
 
                         // Set submission iteration to current VDF iteration
-                        tx.submission_iteration = current_iter;
+                        tx.submission_iteration = current_iter as u64;
 
                         // Validate timelock parameters
                         let decrypt_iter = tx.submission_iteration + tx.puzzle.hardness as u64;
@@ -266,7 +266,7 @@ impl KalaNode {
                     let cvdf = self.cvdf_streamer.read().await;
                     if let Ok(checkpoint) = cvdf.export_state() {
                         let (progress, _) = cvdf.get_progress().unwrap_or((0, 0));
-                        state.update_from_cvdf_checkpoint(checkpoint, progress);
+                        state.update_from_cvdf_checkpoint(checkpoint, progress as u64);
                     }
                     let cvdf_end = cvdf.get_progress().unwrap_or((0, 0)).0;
                     drop(cvdf);

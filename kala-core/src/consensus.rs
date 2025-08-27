@@ -38,7 +38,7 @@ use sha2::{Digest, Sha256};
 use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
 use tokio::sync::RwLock;
-use tracing::{debug, info, warn};
+use tracing::{info, warn};
 
 use kala_state::{ChainState, TickCertificate, TickType};
 use kala_transaction::{
@@ -490,7 +490,7 @@ impl TickProcessor {
         let certificate = TickCertificate {
             tick_number: tick_num,
             tick_type,
-            vdf_iteration: current_time, // CVDF time instead of VDF iteration
+            vdf_iteration: current_time as u64, // CVDF time instead of VDF iteration
             vdf_form: (
                 format!("cvdf_output_{}", cvdf_proof.output.a),
                 format!("cvdf_output_{}", cvdf_proof.output.b), 
@@ -511,46 +511,6 @@ impl TickProcessor {
         Ok(cert_with_hash)
     }
 
-        let vdf_read = vdf.read().await;
-        let state_read = state.read().await;
-
-        // Get VDF tick certificate if available
-        let vdf_tick_cert = vdf_read.get_tick_certificate(tick_num);
-
-        // Determine tick type based on paper's classification
-        let tick_type = if transactions.is_empty() {
-            TickType::Empty
-        } else {
-            TickType::Full
-        };
-
-        // Get VDF state from checkpoint
-        let vdf_checkpoint = vdf_read.checkpoint();
-
-        // Create unified certificate that combines VDF and consensus data
-        let certificate = TickCertificate {
-            tick_number: tick_num,
-            tick_type,
-            vdf_iteration: vdf_checkpoint.iteration,
-            vdf_form: (
-                vdf_checkpoint.form_a.clone(),
-                vdf_checkpoint.form_b.clone(),
-                vdf_checkpoint.form_c.clone(),
-            ),
-            hash_chain_value: vdf_checkpoint.hash_chain,
-            tick_hash: [0; 32], // Will be computed below
-            transaction_count: transactions.len() as u32,
-            transaction_merkle_root: tx_merkle_root,
-            timestamp: SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs(),
-            previous_tick_hash: state_read.last_tick_hash,
-        };
-
-        // Compute tick hash
-        let mut cert_with_hash = certificate;
-        cert_with_hash.tick_hash = cert_with_hash.compute_hash();
-
-        Ok(cert_with_hash)
-    }
 
     fn hash_transaction(tx: &Transaction) -> [u8; 32] {
         let mut hasher = Sha256::new();
@@ -594,102 +554,6 @@ impl TickProcessor {
         hasher.finalize().into()
     }
 
-    /// Handles tick processing failures with graceful degradation
-    ///
-    /// This function implements Algorithm 4 from the Kala paper for handling
-    /// situations where tick processing cannot complete normally. It ensures
-    /// the VDF computation continues uninterrupted while creating a checkpoint
-    /// tick that maintains chain integrity.
-    ///
-    /// # Graceful Degradation Strategy
-    ///
-    /// 1. **Complete VDF iterations**: Finish remaining iterations for the tick
-    /// 2. **Create checkpoint tick**: Generate a valid tick certificate without transactions
-    /// 3. **Update state**: Maintain chain continuity and VDF checkpoints
-    /// 4. **Preserve timing**: Ensure subsequent ticks remain synchronized
-    ///
-    /// # When to Use
-    ///
-    /// This method should be called when:
-    /// - Transaction decryption fails catastrophically
-    /// - State validation encounters unrecoverable errors
-    /// - Network partitions prevent consensus
-    /// - System resource exhaustion occurs
-    ///
-    /// # Parameters
-    ///
-    /// - `tick_num`: The tick number that failed to process normally
-    /// - `vdf`: Shared reference to the eternal VDF computation
-    /// - `state`: Shared reference to the blockchain state
-    /// - `current_iteration`: Current VDF iteration when failure occurred
-    ///
-    /// # Returns
-    ///
-    /// A [`TickCertificate`] of type [`TickType::Checkpoint`] that:
-    /// - Contains no transactions but maintains VDF proof
-    /// - Preserves chain continuity and timing
-    /// - Allows the network to continue operation
-    pub async fn handle_tick_failure(
-        &self,
-        tick_num: u64,
-        vdf: Arc<RwLock<EternalVDF>>,
-        state: Arc<RwLock<ChainState>>,
-        current_iteration: u64,
-    ) -> Result<TickCertificate> {
-        let k = self.iterations_per_tick;
-        let tick_end = (tick_num + 1) * k;
-        let remaining = tick_end - current_iteration;
-
-        warn!(
-            "Tick {}: Handling failure with {} iterations remaining",
-            tick_num, remaining
-        );
-
-        // Complete remaining VDF iterations without timestamping
-        for _ in 0..remaining {
-            let mut vdf_write = vdf.write().await;
-            vdf_write.step(None);
-            drop(vdf_write);
-        }
-
-        // Create checkpoint tick (no transactions)
-        let vdf_read = vdf.read().await;
-        let state_read = state.read().await;
-
-        // Get VDF state
-        let vdf_checkpoint = vdf_read.checkpoint();
-
-        let certificate = TickCertificate {
-            tick_number: tick_num,
-            tick_type: TickType::Checkpoint,
-            vdf_iteration: vdf_checkpoint.iteration,
-            vdf_form: (
-                vdf_checkpoint.form_a.clone(),
-                vdf_checkpoint.form_b.clone(),
-                vdf_checkpoint.form_c.clone(),
-            ),
-            hash_chain_value: vdf_checkpoint.hash_chain,
-            tick_hash: [0; 32],
-            transaction_count: 0,
-            transaction_merkle_root: [0; 32],
-            timestamp: SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs(),
-            previous_tick_hash: state_read.last_tick_hash,
-        };
-
-        let mut cert_with_hash = certificate;
-        cert_with_hash.tick_hash = cert_with_hash.compute_hash();
-
-        // Update state even for checkpoint
-        drop(state_read);
-        let mut state_write = state.write().await;
-        state_write.current_tick = tick_num + 1;
-        state_write.last_tick_hash = cert_with_hash.tick_hash;
-
-        let vdf_checkpoint = vdf_read.checkpoint();
-        state_write.update_from_vdf_checkpoint(vdf_checkpoint);
-
-        Ok(cert_with_hash)
-    }
 }
 
 /// Computes the Merkle root of a list of transaction hashes

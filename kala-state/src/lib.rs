@@ -362,7 +362,7 @@ impl ChainState {
     }
     
     /// Get starting form for CVDF (creates identity form)
-    pub fn get_starting_form(&self) -> Option<kala_tick::QuadraticForm> {
+    pub fn get_starting_form(&self) -> Option<kala_tick::form::QuadraticForm> {
         use kala_tick::{Discriminant, QuadraticForm};
         
         // Create default discriminant and return identity form
