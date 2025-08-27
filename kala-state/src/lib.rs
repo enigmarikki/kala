@@ -64,7 +64,7 @@
 
 use kala_common::prelude::*;
 use kala_common::types::Hash;
-use kala_vdf::{TickCertificate as VDFTickCertificate, VDFCheckpoint};
+use kala_tick::{CVDFProof};
 use serde_json;
 use std::collections::HashMap;
 
@@ -78,10 +78,11 @@ pub use tick::{TickCertificate, TickType};
 #[derive(Serialize, Deserialize, Clone)]
 pub struct ChainState {
     pub current_tick: BlockHeight,
-    pub current_iteration: IterationNumber,
+    pub current_iteration: IterationNumber, 
     pub last_tick_hash: Hash,
     pub total_transactions: u64,
-    pub vdf_checkpoint: VDFCheckpoint,
+    pub cvdf_checkpoint: Option<Vec<u8>>, // CVDF state
+    pub cvdf_progress: u64, // CVDF time progress
     pub tick_size: u64, // k = 65536 by default
     accounts: HashMap<Hash, Account>,
     puzzles: HashMap<Hash, PuzzleState>,
@@ -132,31 +133,29 @@ impl StateDB {
         Ok(())
     }
 
-    pub async fn store_vdf_tick_certificate(&self, cert: &VDFTickCertificate) -> KalaResult<()> {
-        let key = format!("{:016x}", cert.tick_number);
-        // Use JSON serialization for external types
-        let json_data = serde_json::to_vec(cert).map_err(|e| {
-            KalaError::serialization(format!("Failed to serialize VDF certificate: {}", e))
+    pub async fn store_cvdf_proof(&self, tick_number: u64, proof: &CVDFProof) -> KalaResult<()> {
+        let key = format!("{:016x}", tick_number);
+        let json_data = serde_json::to_vec(proof).map_err(|e| {
+            KalaError::serialization(format!("Failed to serialize CVDF proof: {}", e))
         })?;
         self.db
-            .put_raw(format!("vdf_tick:{}", key).as_bytes(), &json_data)
+            .put_raw(format!("cvdf_proof:{}", key).as_bytes(), &json_data)
     }
 
-    pub async fn get_vdf_tick_certificate(
+    pub async fn get_cvdf_proof(
         &self,
         tick_number: u64,
-    ) -> KalaResult<Option<VDFTickCertificate>> {
+    ) -> KalaResult<Option<CVDFProof>> {
         let key = format!("{:016x}", tick_number);
-        // Use JSON deserialization for external types
-        match self.db.get_raw(format!("vdf_tick:{}", key).as_bytes())? {
+        match self.db.get_raw(format!("cvdf_proof:{}", key).as_bytes())? {
             Some(data) => {
-                let cert = serde_json::from_slice(&data).map_err(|e| {
+                let proof = serde_json::from_slice(&data).map_err(|e| {
                     KalaError::serialization(format!(
-                        "Failed to deserialize VDF certificate: {}",
+                        "Failed to deserialize CVDF proof: {}",
                         e
                     ))
                 })?;
-                Ok(Some(cert))
+                Ok(Some(proof))
             }
             None => Ok(None),
         }
@@ -217,55 +216,40 @@ impl StateDB {
 
 impl ChainState {
     pub fn new() -> Self {
-        let discriminant = "-141140317794792668862943332656856519378482291428727287413318722089216448567155737094768903643716404517549715385664163360316296284155310058980984373770517398492951860161717960368874227473669336541818575166839209228684755811071416376384551902149780184532086881683576071479646499601330824259260645952517205526679";
-
         Self {
             current_tick: 0,
             current_iteration: 0,
             last_tick_hash: [0; 32],
             total_transactions: 0,
             tick_size: 65536, // k from the paper
-            vdf_checkpoint: VDFCheckpoint {
-                iteration: 0,
-                form_a: "1".to_string(),
-                form_b: "0".to_string(),
-                form_c: "1".to_string(),
-                hash_chain: {
-                    use sha2::{Digest, Sha256};
-                    let mut hasher = Sha256::new();
-                    hasher.update(b"genesis");
-                    hasher.finalize().into()
-                },
-                discriminant: discriminant.to_string(),
-                tick_size: 65536,
-                tick_certificates: Vec::new(),
-            },
+            cvdf_checkpoint: None,
+            cvdf_progress: 0,
             accounts: HashMap::new(),
             puzzles: HashMap::new(),
         }
     }
 
-    pub fn from_vdf_checkpoint(checkpoint: VDFCheckpoint) -> Self {
-        let current_tick = checkpoint.iteration / checkpoint.tick_size;
-        let current_iteration = checkpoint.iteration;
-
+    pub fn from_cvdf_checkpoint(checkpoint: Vec<u8>, progress: u64) -> Self {
+        let current_tick = progress / 65536;
+        
         Self {
             current_tick,
-            current_iteration,
-            last_tick_hash: checkpoint.hash_chain,
+            current_iteration: progress,
+            last_tick_hash: [0; 32], // Will be updated from checkpoint
             total_transactions: 0,
-            tick_size: checkpoint.tick_size,
-            vdf_checkpoint: checkpoint,
+            tick_size: 65536,
+            cvdf_checkpoint: Some(checkpoint),
+            cvdf_progress: progress,
             accounts: HashMap::new(),
             puzzles: HashMap::new(),
         }
     }
 
-    pub fn update_from_vdf_checkpoint(&mut self, checkpoint: VDFCheckpoint) {
-        self.current_iteration = checkpoint.iteration;
-        self.current_tick = checkpoint.iteration / checkpoint.tick_size;
-        self.last_tick_hash = checkpoint.hash_chain;
-        self.vdf_checkpoint = checkpoint;
+    pub fn update_from_cvdf_checkpoint(&mut self, checkpoint: Vec<u8>, progress: u64) {
+        self.current_iteration = progress;
+        self.current_tick = progress / self.tick_size;
+        self.cvdf_checkpoint = Some(checkpoint);
+        self.cvdf_progress = progress;
     }
 
     pub fn get_account(&self, address: &Hash) -> Option<&Account> {
@@ -355,6 +339,38 @@ impl ChainState {
     /// Check if we're at a tick boundary
     pub fn is_tick_boundary(&self, iteration: u64) -> bool {
         iteration % self.tick_size == 0 && iteration > 0
+    }
+    
+    /// Set CVDF checkpoint data
+    pub fn set_cvdf_checkpoint(&mut self, checkpoint: Vec<u8>) {
+        self.cvdf_checkpoint = Some(checkpoint);
+    }
+    
+    /// Get CVDF checkpoint data
+    pub fn get_cvdf_checkpoint(&self) -> Option<&Vec<u8>> {
+        self.cvdf_checkpoint.as_ref()
+    }
+    
+    /// Set CVDF progress
+    pub fn set_cvdf_progress(&mut self, progress: u64) {
+        self.cvdf_progress = progress;
+    }
+    
+    /// Get CVDF progress
+    pub fn get_cvdf_progress(&self) -> u64 {
+        self.cvdf_progress
+    }
+    
+    /// Get starting form for CVDF (creates identity form)
+    pub fn get_starting_form(&self) -> Option<kala_tick::QuadraticForm> {
+        use kala_tick::{Discriminant, QuadraticForm};
+        
+        // Create default discriminant and return identity form
+        if let Ok(discriminant) = Discriminant::generate(1024) {
+            Some(QuadraticForm::identity(&discriminant))
+        } else {
+            None
+        }
     }
 }
 

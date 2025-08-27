@@ -258,8 +258,6 @@ dependencies = [
  "cexpr",
  "clang-sys",
  "itertools 0.13.0",
- "log",
- "prettyplease",
  "proc-macro2",
  "quote",
  "regex",
@@ -1150,7 +1148,7 @@ dependencies = [
 
 [[package]]
 name = "kala-common"
-version = "0.0.2"
+version = "0.0.3"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -1169,12 +1167,12 @@ dependencies = [
 
 [[package]]
 name = "kala-core"
-version = "0.0.2"
+version = "0.0.3"
 dependencies = [
  "anyhow",
  "async-trait",
  "bincode",
- "bindgen",
+ "blake3",
  "clap",
  "futures",
  "hex",
@@ -1182,9 +1180,10 @@ dependencies = [
  "kala-common",
  "kala-rpc",
  "kala-state",
+ "kala-tick",
  "kala-transaction",
- "kala-vdf",
  "num-bigint",
+ "rug",
  "serde",
  "serde_json",
  "serde_yaml",
@@ -1197,7 +1196,7 @@ dependencies = [
 
 [[package]]
 name = "kala-rpc"
-version = "0.0.2"
+version = "0.0.3"
 dependencies = [
  "anyhow",
  "axum",
@@ -1214,13 +1213,14 @@ dependencies = [
 
 [[package]]
 name = "kala-state"
-version = "0.0.2"
+version = "0.0.3"
 dependencies = [
  "anyhow",
  "bincode",
  "kala-common",
- "kala-vdf",
+ "kala-tick",
  "rocksdb",
+ "rug",
  "serde",
  "serde_json",
  "sha2",
@@ -1256,7 +1256,7 @@ dependencies = [
 
 [[package]]
 name = "kala-transaction"
-version = "0.0.2"
+version = "0.0.3"
 dependencies = [
  "aes-gcm",
  "anyhow",
@@ -1277,21 +1277,6 @@ dependencies = [
  "tokio",
  "tracing",
  "which",
-]
-
-[[package]]
-name = "kala-vdf"
-version = "0.0.2"
-dependencies = [
- "anyhow",
- "bincode",
- "bindgen",
- "hex",
- "kala-common",
- "serde",
- "sha2",
- "tick",
- "tracing",
 ]
 
 [[package]]
@@ -1645,16 +1630,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "85eae3c4ed2f50dcfe72643da4befc30deadb458a9b590d720cde2f2b1e97da9"
 dependencies = [
  "zerocopy",
-]
-
-[[package]]
-name = "prettyplease"
-version = "0.2.36"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ff24dfcda44452b9816fff4cd4227e1bb73ff5a2f1bc1105aa92fb8565ce44d2"
-dependencies = [
- "proc-macro2",
- "syn",
 ]
 
 [[package]]
@@ -2185,15 +2160,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f60246a4944f24f6e018aa17cdeffb7818b76356965d03b07d6a9886e8962185"
 dependencies = [
  "cfg-if",
-]
-
-[[package]]
-name = "tick"
-version = "0.1.0"
-dependencies = [
- "bindgen",
- "gmp-mpfr-sys",
- "libc",
 ]
 
 [[package]]

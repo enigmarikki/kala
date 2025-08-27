@@ -5,32 +5,35 @@
 # and consensus with MEV resistance through timelock encryption.
 #
 # The workspace is organized into the following crates:
-# - kala-core: Main blockchain node implementation with consensus logic
+# - kala-core: Main blockchain node implementation with CVDF consensus logic
 # - kala-common: Shared utilities, types, and helper functions
 # - kala-state: State management and account handling
 # - kala-rpc: JSON-RPC server for external API access
 # - kala-transaction: Transaction types and processing logic
-# - kala-vdf: Verifiable Delay Function implementations
-# - tick/tick: Low-level VDF computation engine (C++ with Rust bindings)
+# - kala-tick: CVDF streaming implementation with Pietrzak proofs (NEW)
 # - timelocks/timelocks: RSW timelock puzzle implementations for MEV resistance
+#
+# DEPRECATED (will be removed):
+# - kala-vdf: Legacy Wesolowski VDF implementations
+# - tick/tick: Legacy C++ VDF computation engine
 
 [workspace]
 resolver = "2"
 members = [
-    "tick/tick",                # VDF computation engine
+    # "tick/tick",                # DEPRECATED: VDF computation engine (replaced by kala-tick)
     "timelocks/timelocks",      # RSW timelock puzzles for MEV mitigation
     "kala-common",              # Shared utilities and types
     "kala-core",                # Main blockchain node and consensus
     "kala-state",               # State management and accounts
     "kala-rpc",                 # JSON-RPC API server
     "kala-transaction",         # Transaction types and processing
-    "kala-vdf",                 # VDF implementations and utilities
-    "kala-tick"                 # CVDF streamer to replace old tick
+    # "kala-vdf",                 # DEPRECATED: VDF implementations (replaced by kala-tick)
+    "kala-tick"                 # CVDF streamer with Pietrzak proofs
 ]
 
 # Shared package metadata for all workspace members
 [workspace.package]
-version = "0.0.2"
+version = "0.0.3"
 authors = ["Hrishi"]
 edition = "2021"
 license = "MIT OR Apache-2.0"
@@ -40,15 +43,15 @@ repository = "https://github.com/enigmarikki/kala"
 # This ensures version consistency across all crates and simplifies maintenance
 [workspace.dependencies]
 # Internal crates - VDF and cryptographic components
-tick = { path = "tick/tick" }                              # C++ VDF computation engine
+# tick = { path = "tick/tick" }                              # DEPRECATED: C++ VDF computation engine
 timelocks = { path = "timelocks/timelocks" }               # RSW timelock puzzles
 kala-common = { path = "kala-common" }                     # Shared utilities and types
 kala-core = { path = "kala-core" }                         # Main blockchain node
 kala-state = { path = "kala-state" }                       # State management
 kala-rpc = { path = "kala-rpc" }                           # JSON-RPC API
 kala-transaction = { path = "kala-transaction" }           # Transaction handling
-kala-vdf = { path = "kala-vdf" }                           # VDF utilities
-kala-tick = { path = "kala-tick"}                          # CVDF streamer to replace old tick
+# kala-vdf = { path = "kala-vdf" }                           # DEPRECATED: VDF utilities (replaced by kala-tick)
+kala-tick = { path = "kala-tick"}                          # CVDF streamer with Pietrzak proofs
 
 # External dependencies - grouped by category
 
@@ -87,9 +90,9 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] } # Log subscr
 # CLI and configuration
 clap = { version = "4.0", features = ["derive"] }          # Command line argument parsing
 
-# Build-time dependencies
-cc = "1.0"                                                  # C/C++ compiler integration
-bindgen = "0.72"                                            # Rust bindings generator for C/C++
+# Build-time dependencies (reduced after CVDF migration)
+cc = "1.0"                                                  # C/C++ compiler integration (for timelocks only)
+# bindgen = "0.72"                                            # DEPRECATED: No longer needed after CVDF migration
 
 # Async utilities
 async-trait = "0.1"                                         # Async trait support

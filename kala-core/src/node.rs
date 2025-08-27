@@ -12,7 +12,7 @@ use kala_rpc::{
 };
 use kala_state::{ChainState, StateDB, TickCertificate};
 use kala_transaction::{EncryptionContext, TimelockTransaction};
-use kala_vdf::EternalVDF;
+use kala_tick::{CVDFConfig, CVDFStreamer};
 use serde_json;
 
 // RPC handler that communicates with the node via channels
@@ -31,7 +31,7 @@ const TX_ACCEPTANCE_WINDOW_END: f64 = 0.3; // Accept txs until 30% of target tic
 
 pub struct KalaNode {
     config: NodeConfig,
-    vdf: Arc<RwLock<EternalVDF>>,
+    cvdf_streamer: Arc<RwLock<CVDFStreamer>>,
     state: Arc<RwLock<ChainState>>,
     state_db: Arc<StateDB>,
     tick_processor: Arc<TickProcessor>,
@@ -47,11 +47,23 @@ impl KalaNode {
         // Load chain state
         let chain_state = state_db.load_chain_state().await?;
 
-        // Initialize or restore VDF from checkpoint
-        let vdf = match EternalVDF::from_checkpoint(&chain_state.vdf_checkpoint) {
-            Ok(vdf) => Arc::new(RwLock::new(vdf)),
-            Err(e) => return Err(anyhow::anyhow!("Failed to initialize VDF: {}", e)),
+        // Initialize CVDF streamer with default configuration
+        let cvdf_config = CVDFConfig {
+            base_difficulty: 20, // 2^20 squarings per step
+            tree_arity: 256,
+            security_param: 256,
+            ..CVDFConfig::default()
         };
+        let mut cvdf_streamer = CVDFStreamer::new(cvdf_config);
+        
+        // Initialize with starting form from state if available
+        if let Some(form) = chain_state.get_starting_form() {
+            if let Err(e) = cvdf_streamer.initialize(form) {
+                return Err(anyhow::anyhow!("Failed to initialize CVDF with form: {}", e));
+            }
+        }
+        
+        let cvdf_streamer = Arc::new(RwLock::new(cvdf_streamer));
 
         // Create tick processor with proper parameters
         let tick_processor = Arc::new(TickProcessor::new(config.iterations_per_tick));
@@ -63,8 +75,8 @@ impl KalaNode {
         );
         info!("  - Current tick: {}", chain_state.current_tick);
         info!(
-            "  - VDF iteration: {}",
-            chain_state.vdf_checkpoint.iteration
+            "  - CVDF progress: {} steps completed",
+            chain_state.get_cvdf_progress()
         );
         info!(
             "  - Last tick hash: {}",
@@ -73,7 +85,7 @@ impl KalaNode {
 
         Ok(Self {
             config,
-            vdf,
+            cvdf_streamer,
             state: Arc::new(RwLock::new(chain_state)),
             state_db,
             tick_processor,
@@ -125,17 +137,15 @@ impl KalaNode {
                 tokio::select! {
                     // Handle chain info requests
                     Some(reply_tx) = chain_info_rx.recv() => {
-                        let vdf = rpc_node.vdf.read().await;
+                        let cvdf = rpc_node.cvdf_streamer.read().await;
                         let state = rpc_node.state.read().await;
+                        let (current_time, node_count) = cvdf.get_progress().unwrap_or((0, 0));
 
                         let info = ChainInfo {
                             current_tick: state.current_tick,
-                            current_iteration: vdf.get_iteration(),
-                            vdf_output: {
-                                let (a, b, c) = vdf.get_form_values();
-                                format!("({}, {}, {})", a, b, c)
-                            },
-                            hash_chain: hex::encode(vdf.get_hash_chain()),
+                            current_iteration: current_time,
+                            vdf_output: format!("CVDF-{} nodes, {} time", node_count, current_time),
+                            hash_chain: "streaming".to_string(),
                             total_transactions: state.total_transactions,
                             accounts: state.get_account_count(),
                         };
@@ -146,7 +156,7 @@ impl KalaNode {
                     // Handle transaction submissions
                     Some((mut tx, reply_tx)) = submit_rx.recv() => {
                         let current_tick = rpc_node.state.read().await.current_tick;
-                        let current_iter = rpc_node.vdf.read().await.get_iteration();
+                        let current_iter = rpc_node.cvdf_streamer.read().await.get_progress().unwrap_or((0, 0)).0;
                         let k = rpc_node.config.iterations_per_tick;
 
                         // Validate transaction target tick
@@ -229,23 +239,16 @@ impl KalaNode {
             info!("│         Starting Tick {:08}          │", current_tick);
             info!("└─────────────────────────────────────────┘");
 
-            // Get VDF state at tick start
-            let vdf_start = {
-                let vdf = self.vdf.read().await;
-                let iter = vdf.get_iteration();
-                let hash = hex::encode(&vdf.get_hash_chain()[..8]);
-                info!("VDF State: iteration={}, hash={}...", iter, hash);
-                iter
+            // Get CVDF state at tick start
+            let cvdf_start = {
+                let cvdf = self.cvdf_streamer.read().await;
+                let (current_time, node_count) = cvdf.get_progress().unwrap_or((0, 0));
+                info!("CVDF State: time={}, nodes={}", current_time, node_count);
+                current_time
             };
 
-            // Ensure we're aligned with tick boundaries
-            let expected_start = current_tick * self.config.iterations_per_tick;
-            if vdf_start != expected_start {
-                warn!(
-                    "VDF iteration {} doesn't match expected tick start {}",
-                    vdf_start, expected_start
-                );
-            }
+            // CVDF streaming doesn't require strict tick alignment
+            // It continuously streams proofs as computation progresses
 
             // Process the eternal tick
             match self.process_eternal_tick(current_tick).await {
@@ -259,11 +262,14 @@ impl KalaNode {
                     state.last_tick_hash = certificate.tick_hash;
                     state.total_transactions += certificate.transaction_count as u64;
 
-                    // Update VDF checkpoint in state
-                    let vdf = self.vdf.read().await;
-                    state.vdf_checkpoint = vdf.checkpoint();
-                    let vdf_end = vdf.get_iteration();
-                    drop(vdf);
+                    // Update CVDF checkpoint in state  
+                    let cvdf = self.cvdf_streamer.read().await;
+                    if let Ok(checkpoint) = cvdf.export_state() {
+                        let (progress, _) = cvdf.get_progress().unwrap_or((0, 0));
+                        state.update_from_cvdf_checkpoint(checkpoint, progress);
+                    }
+                    let cvdf_end = cvdf.get_progress().unwrap_or((0, 0)).0;
+                    drop(cvdf);
 
                     // Persist state to database
                     self.state_db.save_chain_state(&state).await?;
@@ -273,7 +279,7 @@ impl KalaNode {
                     let tick_str = format!("Tick {} Complete!", current_tick);
                     let type_str = format!("Type: {:?}", certificate.tick_type);
                     let tx_str = format!("Transactions: {:04}", certificate.transaction_count);
-                    let vdf_str = format!("VDF: {} → {}", vdf_start, vdf_end);
+                    let cvdf_str = format!("CVDF: {} → {}", cvdf_start, cvdf_end);
                     let hash_str = format!("Hash: {}...", hex::encode(&certificate.tick_hash[..8]));
 
                     // Calculate the box width based on the longest line
@@ -281,7 +287,7 @@ impl KalaNode {
                         tick_str.len(),
                         type_str.len(),
                         tx_str.len(),
-                        vdf_str.len(),
+                        cvdf_str.len(),
                         hash_str.len(),
                     ]
                     .iter()
@@ -301,12 +307,12 @@ impl KalaNode {
                     info!("{}", pad(&tick_str));
                     info!("{}", pad(&type_str));
                     info!("{}", pad(&tx_str));
-                    info!("{}", pad(&vdf_str));
+                    info!("{}", pad(&cvdf_str));
                     info!("{}", pad(&hash_str));
                     info!("{}", bottom_line);
-                    // Log VDF checkpoint periodically
+                    // Log CVDF checkpoint periodically
                     if current_tick % 10 == 0 {
-                        self.log_vdf_checkpoint().await;
+                        self.log_cvdf_checkpoint().await;
                     }
                 }
                 Err(e) => {
@@ -335,12 +341,12 @@ impl KalaNode {
         );
 
         // For single node, we follow the paper but skip Byzantine consensus
-        // The tick processor handles all the phases correctly
+        // The tick processor handles all the phases correctly with CVDF streaming
         let certificate = self
             .tick_processor
-            .process_tick(
+            .process_cvdf_tick(
                 tick_num,
-                self.vdf.clone(),
+                self.cvdf_streamer.clone(),
                 self.state.clone(),
                 encrypted_txs,
             )
@@ -381,30 +387,23 @@ impl KalaNode {
         tick_txs
     }
 
-    /// Log VDF checkpoint information
-    async fn log_vdf_checkpoint(&self) {
-        let vdf = self.vdf.read().await;
-        let checkpoint = vdf.checkpoint();
-
+    /// Log CVDF checkpoint information
+    async fn log_cvdf_checkpoint(&self) {
+        let cvdf = self.cvdf_streamer.read().await;
+        let (current_time, node_count) = cvdf.get_progress().unwrap_or((0, 0));
+        
         // Format all values first
-        let title = "VDF Checkpoint";
-        let iteration_str = format!("Iteration: {}", checkpoint.iteration);
-        let forms_str = format!(
-            "Forms: ({}, {}, {})",
-            preview(&checkpoint.form_a, 8),
-            preview(&checkpoint.form_b, 8),
-            preview(&checkpoint.form_c, 8)
-        );
-        let hash_str = format!("Hash: {}...", hex::encode(&checkpoint.hash_chain[..8]));
-        let certs_str = format!("Tick Certs: {}", checkpoint.tick_certificates.len());
-
+        let title = "CVDF Checkpoint";
+        let time_str = format!("Time: {}", current_time);
+        let nodes_str = format!("Nodes: {}", node_count);
+        let proof_str = "Proofs: Streaming Pietrzak";
+        
         // Calculate the box width based on the longest line
         let box_width = [
             title.len(),
-            iteration_str.len(),
-            forms_str.len(),
-            hash_str.len(),
-            certs_str.len(),
+            time_str.len(),
+            nodes_str.len(),
+            proof_str.len(),
         ]
         .iter()
         .max()
@@ -429,10 +428,9 @@ impl KalaNode {
 
         info!("{}", top_line);
         info!("{}", center(&title));
-        info!("{}", pad(&iteration_str));
-        info!("{}", pad(&forms_str));
-        info!("{}", pad(&hash_str));
-        info!("{}", pad(&certs_str));
+        info!("{}", pad(&time_str));
+        info!("{}", pad(&nodes_str));
+        info!("{}", pad(&proof_str));
         info!("{}", bottom_line);
     }
 }

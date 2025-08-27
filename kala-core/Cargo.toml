@@ -23,7 +23,7 @@ repository.workspace = true
 [dependencies]
 # Internal Kala crates - the modular architecture
 kala-common = { workspace = true }                         # Shared utilities and types
-kala-vdf = { workspace = true }                            # VDF implementations
+kala-tick = { workspace = true }                           # CVDF streaming implementation
 kala-state = { workspace = true }                          # State management
 kala-transaction = { workspace = true }                    # Transaction processing
 kala-rpc = { workspace = true }                            # JSON-RPC API server
@@ -52,12 +52,11 @@ bincode = { workspace = true }                             # Binary serializatio
 
 # Mathematics for VDF operations
 num-bigint = { workspace = true }                          # Arbitrary precision integers
+rug = { workspace = true }                                  # High-precision arithmetic for CVDF
+blake3 = "1.5"                                             # Blake3 for CVDF hashing
 
 # RPC and networking
 jsonrpsee = { workspace = true }                           # JSON-RPC implementation
-
-# Build dependencies
-bindgen = { workspace = true }                             # C++ bindings generation
 
 # Development node binary - for testing and experimentation
 # Usage: cargo run -p kala-core --bin devnode -- --help
@@ -65,6 +64,3 @@ bindgen = { workspace = true }                             # C++ bindings genera
 name = "devnode"
 path = "bin/devnode.rs"
 
-# Build-time dependencies for C++ integration
-[build-dependencies]
-bindgen = "0.72.0"                                         # Generate Rust bindings for C++ VDF code
