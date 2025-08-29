@@ -41,11 +41,11 @@ use tokio::sync::RwLock;
 use tracing::{info, warn};
 
 use kala_state::{ChainState, TickCertificate, TickType};
+use kala_tick::CVDFStreamer;
 use kala_transaction::{
     decrypt_timelock_batch, decrypt_timelock_transaction, EncryptionContext, TimelockTransaction,
     Transaction,
 };
-use kala_tick::CVDFStreamer;
 
 /// Core consensus processor implementing Kala's tick-based architecture
 ///
@@ -123,17 +123,17 @@ impl TickProcessor {
     ///
     /// # Four-Phase Algorithm
     ///
-    /// 1. **Collection Phase (0 to k/3)**:
+    /// 1. **Witness Phase (0 to k/3)**:
     ///    - Timestamps encrypted transactions into VDF hash chain
     ///    - Maintains canonical arrival order
     ///    - Creates unforgeable transaction history
     ///
-    /// 2. **Ordering Phase (at k/3)**:
+    /// 2. **Consensus Phase (k/3 to k/2)**:
     ///    - Commits to final transaction ordering
     ///    - Based on VDF timestamped arrival order
     ///    - Prevents MEV through pre-commitment
     ///
-    /// 3. **Decryption Phase (k/3 to 2k/3)**:
+    /// 3. **Decryption Phase (k/2 to 2k/3)**:
     ///    - Decrypts timelock puzzles in parallel
     ///    - Uses GPU acceleration when available
     ///    - Falls back to CPU if GPU fails
@@ -214,41 +214,48 @@ impl TickProcessor {
         // Update encryption context with current tick
         self.encryption_ctx.update_tick(tick_num);
 
-        // Phase 1: Collection - Controlled iteration with CVDF proofs
-        info!("Tick {}: Phase 1 - Collection phase ({} iterations)", tick_num, k / 3);
+        // Phase 1: Witness phase - Controlled iteration with CVDF proofs
+        info!(
+            "Tick {}: Phase 1 - Witness phase ({} iterations)",
+            tick_num,
+            k / 3
+        );
         let collection_phase_steps = k / 3;
-        
+
         // Get starting form for this tick - use CVDF streamer's discriminant for consistency
         let mut current_form = {
             let cvdf_read = cvdf_streamer.read().await;
             let discriminant = cvdf_read.get_discriminant();
             kala_tick::QuadraticForm::identity(discriminant)
         };
-        
+
         // Perform collection phase iterations with CVDF proofs
         let collection_result = {
             let mut cvdf = cvdf_streamer.write().await;
             cvdf.compute_k_steps(&current_form, collection_phase_steps as usize)?
         };
-        
+
         current_form = collection_result.output;
 
         // Phase 2: Ordering - commit to transaction ordering
         info!("Tick {}: Phase 2 - Transaction ordering", tick_num);
         let mut ordered_txs = encrypted_txs;
         ordered_txs.sort_by_key(|tx| tx.submission_iteration);
-        
+
         // Perform one step to commit ordering
         let ordering_result = {
             let mut cvdf = cvdf_streamer.write().await;
             cvdf.compute_single_step(&current_form)?
         };
-        
+
         current_form = ordering_result.output;
 
         // Phase 3: Parallel Decryption
-        info!("Tick {}: Phase 3 - Parallel decryption with CVDF streaming", tick_num);
-        
+        info!(
+            "Tick {}: Phase 3 - Parallel decryption with CVDF streaming",
+            tick_num
+        );
+
         // Start parallel decryption
         let decrypt_handle = tokio::spawn({
             let txs = ordered_txs.clone();
@@ -276,7 +283,7 @@ impl TickProcessor {
             let mut cvdf = cvdf_streamer.write().await;
             cvdf.compute_k_steps(&current_form, decryption_phase_steps as usize)?
         };
-        
+
         current_form = decryption_result.output;
 
         // Wait for decryption to complete
@@ -324,7 +331,7 @@ impl TickProcessor {
                 step_count: 0,
             }
         };
-        
+
         current_form = final_result.output;
 
         info!(
@@ -335,12 +342,7 @@ impl TickProcessor {
 
         // Create tick certificate with the final CVDF state
         let certificate = self
-            .create_cvdf_certificate(
-                tick_num,
-                valid_txs,
-                &current_form,
-                state.clone(),
-            )
+            .create_cvdf_certificate(tick_num, valid_txs, &current_form, state.clone())
             .await?;
 
         // Update chain state
@@ -364,7 +366,6 @@ impl TickProcessor {
 
         Ok(certificate)
     }
-
 
     fn serialize_timelock_tx(tx: &TimelockTransaction) -> Vec<u8> {
         // Serialize the encrypted transaction for timestamping
@@ -483,17 +484,17 @@ impl TickProcessor {
         state: Arc<RwLock<ChainState>>,
     ) -> Result<TickCertificate> {
         let state_read = state.read().await;
-        
+
         // Determine tick type
         let tick_type = if transactions.is_empty() {
             TickType::Empty
         } else {
             TickType::Full
         };
-        
+
         // Compute transaction merkle root
         let tx_merkle_root = Self::compute_transaction_merkle_root(&transactions);
-        
+
         // Use the final CVDF form as the VDF output
         let certificate = TickCertificate {
             tick_number: tick_num,
@@ -501,24 +502,23 @@ impl TickProcessor {
             vdf_iteration: tick_num * self.iterations_per_tick, // Simple iteration count
             vdf_form: (
                 format!("cvdf_{}", final_form.a.to_string_radix(16)),
-                format!("cvdf_{}", final_form.b.to_string_radix(16)), 
+                format!("cvdf_{}", final_form.b.to_string_radix(16)),
                 format!("cvdf_{}", final_form.c.to_string_radix(16)),
             ),
             hash_chain_value: [0u8; 32], // Simplified for now
-            tick_hash: [0; 32], // Will be computed below
+            tick_hash: [0; 32],          // Will be computed below
             transaction_count: transactions.len() as u32,
             transaction_merkle_root: tx_merkle_root,
             timestamp: SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs(),
             previous_tick_hash: state_read.last_tick_hash,
         };
-        
+
         // Compute tick hash
         let mut cert_with_hash = certificate;
         cert_with_hash.tick_hash = cert_with_hash.compute_hash();
-        
+
         Ok(cert_with_hash)
     }
-
 
     fn hash_transaction(tx: &Transaction) -> [u8; 32] {
         let mut hasher = Sha256::new();
@@ -561,7 +561,6 @@ impl TickProcessor {
 
         hasher.finalize().into()
     }
-
 }
 
 /// Computes the Merkle root of a list of transaction hashes
@@ -630,51 +629,48 @@ mod tests {
     use tokio::sync::RwLock;
 
     async fn create_test_environment() -> (
-        TickProcessor, 
-        Arc<RwLock<CVDFStreamer>>, 
+        TickProcessor,
+        Arc<RwLock<CVDFStreamer>>,
         Arc<RwLock<ChainState>>,
         CVDFConfig,
     ) {
         let iterations_per_tick = 100u64; // Smaller for faster testing
         let processor = TickProcessor::new(iterations_per_tick);
-        
+
         let cvdf_config = CVDFConfig {
             tree_arity: 2,
             base_difficulty: 1,
             security_param: 128,
             discriminant: kala_tick::Discriminant::generate(256).unwrap(),
         };
-        
+
         let cvdf_streamer = Arc::new(RwLock::new(CVDFStreamer::new(cvdf_config.clone())));
         let state = Arc::new(RwLock::new(ChainState::new()));
-        
+
         (processor, cvdf_streamer, state, cvdf_config)
     }
 
     #[tokio::test]
     async fn test_process_cvdf_tick_empty() {
         let (processor, cvdf_streamer, state, config) = create_test_environment().await;
-        
+
         let tick_num = 1u64;
         let encrypted_txs = vec![]; // Empty transactions
-        
-        let result = processor.process_cvdf_tick(
-            tick_num,
-            cvdf_streamer,
-            state.clone(),
-            encrypted_txs,
-        ).await;
-        
+
+        let result = processor
+            .process_cvdf_tick(tick_num, cvdf_streamer, state.clone(), encrypted_txs)
+            .await;
+
         if let Err(ref e) = result {
             println!("CVDF tick processing failed with error: {}", e);
         }
         assert!(result.is_ok(), "Empty tick processing should succeed");
-        
+
         let certificate = result.unwrap();
         assert_eq!(certificate.tick_number, tick_num);
         assert!(matches!(certificate.tick_type, TickType::Empty));
         assert_eq!(certificate.transaction_count, 0);
-        
+
         // Verify state was updated
         let state_read = state.read().await;
         assert_eq!(state_read.current_tick, tick_num + 1);
@@ -683,26 +679,28 @@ mod tests {
     #[tokio::test]
     async fn test_process_cvdf_tick_with_phases() {
         let (processor, cvdf_streamer, state, _config) = create_test_environment().await;
-        
+
         let tick_num = 2u64;
         let encrypted_txs = vec![]; // Start with empty for basic phase testing
-        
-        let result = processor.process_cvdf_tick(
-            tick_num,
-            cvdf_streamer.clone(),
-            state.clone(),
-            encrypted_txs,
-        ).await;
-        
+
+        let result = processor
+            .process_cvdf_tick(
+                tick_num,
+                cvdf_streamer.clone(),
+                state.clone(),
+                encrypted_txs,
+            )
+            .await;
+
         assert!(result.is_ok(), "CVDF tick processing should succeed");
-        
+
         let certificate = result.unwrap();
-        
+
         // Verify the tick certificate structure
         assert_eq!(certificate.tick_number, tick_num);
         assert!(!certificate.tick_hash.is_empty() || certificate.tick_hash == [0; 32]); // May be zero but should be present
         assert!(certificate.timestamp > 0); // Should have a valid timestamp
-        
+
         // Verify CVDF computation occurred (should have non-zero iteration count)
         assert!(certificate.vdf_iteration > 0);
     }
@@ -710,23 +708,23 @@ mod tests {
     #[tokio::test]
     async fn test_cvdf_state_checkpoint() {
         let (processor, cvdf_streamer, state, _config) = create_test_environment().await;
-        
+
         let tick_num = 3u64;
-        
+
         // Process a tick to generate CVDF state
-        let result = processor.process_cvdf_tick(
-            tick_num,
-            cvdf_streamer.clone(),
-            state.clone(),
-            vec![],
-        ).await;
-        
+        let result = processor
+            .process_cvdf_tick(tick_num, cvdf_streamer.clone(), state.clone(), vec![])
+            .await;
+
         assert!(result.is_ok(), "Tick processing should succeed");
-        
+
         // Verify CVDF checkpoint was saved
         let state_read = state.read().await;
-        assert!(state_read.cvdf_checkpoint.is_some(), "CVDF checkpoint should be saved");
-        
+        assert!(
+            state_read.cvdf_checkpoint.is_some(),
+            "CVDF checkpoint should be saved"
+        );
+
         // Verify the checkpoint can be exported
         let cvdf = cvdf_streamer.read().await;
         let export_result = cvdf.export_state();
@@ -738,7 +736,7 @@ mod tests {
     async fn test_transaction_validation_empty_state() {
         // Test the static validation functions
         let state = ChainState::new();
-        
+
         let tx = kala_transaction::Transaction::Send(kala_transaction::Send {
             sender: [1u8; 32],
             receiver: [2u8; 32],
@@ -748,53 +746,53 @@ mod tests {
             signature: vec![0u8; 64], // Vec<u8> not array
             gas_sponsorer: [0u8; 32], // Default gas sponsor
         });
-        
+
         // Should fail validation due to insufficient balance in empty state
         let is_valid = TickProcessor::validate_transaction(&tx, &state);
-        assert!(!is_valid, "Transaction should fail validation with empty state");
+        assert!(
+            !is_valid,
+            "Transaction should fail validation with empty state"
+        );
     }
 
     #[tokio::test]
     async fn test_merkle_root_computation() {
         // Test the merkle root computation with known values
-        let hashes = vec![
-            [1u8; 32],
-            [2u8; 32],
-        ];
-        
+        let hashes = vec![[1u8; 32], [2u8; 32]];
+
         let root = compute_merkle_root(&hashes);
         assert_ne!(root, [0u8; 32], "Merkle root should not be empty");
-        
+
         // Test with empty input
         let empty_root = compute_merkle_root(&[]);
         assert_eq!(empty_root, [0u8; 32], "Empty merkle root should be zeros");
-        
+
         // Test with single hash
         let single_hash = [[42u8; 32]];
         let single_root = compute_merkle_root(&single_hash);
-        assert_ne!(single_root, [0u8; 32], "Single hash merkle root should not be empty");
+        assert_ne!(
+            single_root, [0u8; 32],
+            "Single hash merkle root should not be empty"
+        );
     }
 
     #[tokio::test]
     async fn test_certificate_creation() {
         let (processor, _cvdf_streamer, state, _config) = create_test_environment().await;
-        
+
         let tick_num = 5u64;
         let transactions = vec![];
-        
+
         // Create a test quadratic form
         let discriminant = kala_tick::Discriminant::generate(256).unwrap();
         let final_form = kala_tick::QuadraticForm::identity(&discriminant);
-        
-        let result = processor.create_cvdf_certificate(
-            tick_num,
-            transactions,
-            &final_form,
-            state,
-        ).await;
-        
+
+        let result = processor
+            .create_cvdf_certificate(tick_num, transactions, &final_form, state)
+            .await;
+
         assert!(result.is_ok(), "Certificate creation should succeed");
-        
+
         let certificate = result.unwrap();
         assert_eq!(certificate.tick_number, tick_num);
         assert!(matches!(certificate.tick_type, TickType::Empty));
@@ -802,50 +800,68 @@ mod tests {
         assert!(certificate.timestamp > 0);
     }
 
-    #[tokio::test] 
+    #[tokio::test]
     async fn test_cvdf_k_step_integration() {
         let (processor, cvdf_streamer, state, _config) = create_test_environment().await;
-        
+
         // Test that our k-step approach works with realistic values
         let iterations_per_tick = processor.iterations_per_tick;
-        assert!(iterations_per_tick > 0, "Should have positive iterations per tick");
-        
+        assert!(
+            iterations_per_tick > 0,
+            "Should have positive iterations per tick"
+        );
+
         // Each phase should be k/3 iterations
         let phase_iterations = iterations_per_tick / 3;
-        assert!(phase_iterations > 0, "Each phase should have positive iterations");
-        
+        assert!(
+            phase_iterations > 0,
+            "Each phase should have positive iterations"
+        );
+
         // Process a tick and verify it completes in reasonable time
         let start = std::time::Instant::now();
-        
-        let result = processor.process_cvdf_tick(
-            1,
-            cvdf_streamer,
-            state,
-            vec![],
-        ).await;
-        
+
+        let result = processor
+            .process_cvdf_tick(1, cvdf_streamer, state, vec![])
+            .await;
+
         let elapsed = start.elapsed();
-        
+
         assert!(result.is_ok(), "K-step tick processing should succeed");
-        assert!(elapsed.as_secs() < 10, "Processing should complete in reasonable time"); // Generous timeout
-        
+        assert!(
+            elapsed.as_secs() < 10,
+            "Processing should complete in reasonable time"
+        ); // Generous timeout
+
         let certificate = result.unwrap();
-        
+
         // Verify the CVDF computation produced valid output
-        assert!(!certificate.vdf_form.0.is_empty(), "Should have CVDF form output");
-        assert!(!certificate.vdf_form.1.is_empty(), "Should have CVDF form output");
-        assert!(!certificate.vdf_form.2.is_empty(), "Should have CVDF form output");
+        assert!(
+            !certificate.vdf_form.0.is_empty(),
+            "Should have CVDF form output"
+        );
+        assert!(
+            !certificate.vdf_form.1.is_empty(),
+            "Should have CVDF form output"
+        );
+        assert!(
+            !certificate.vdf_form.2.is_empty(),
+            "Should have CVDF form output"
+        );
     }
 
     #[test]
     fn test_tick_processor_creation() {
         let iterations = 1000u64;
         let processor = TickProcessor::new(iterations);
-        
+
         assert_eq!(processor.iterations_per_tick, iterations);
-        
+
         // Should be able to get encryption context
         let ctx = processor.encryption_context();
-        assert!(Arc::strong_count(&ctx) >= 1, "Encryption context should be available");
+        assert!(
+            Arc::strong_count(&ctx) >= 1,
+            "Encryption context should be available"
+        );
     }
 }

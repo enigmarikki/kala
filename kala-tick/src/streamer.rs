@@ -9,6 +9,8 @@ use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::sync::{Arc, RwLock};
 
+const MAX_PROOF_ITERATIONS: i32 = 2_000_000;
+
 /// Pietrzak proof for a single VDF evaluation
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct PietrzakProof {
@@ -429,8 +431,7 @@ impl CVDFStreamer {
         input: &QuadraticForm,
         k: usize,
     ) -> Result<CVDFStepResult, CVDFError> {
-        // Reasonable bounds - no more heat death waiting!
-        if k > 100_000 {
+        if k > 1_000_000 {
             return Err(CVDFError::ComputationError(
                 "Too many steps requested".to_string(),
             ));
@@ -583,7 +584,7 @@ impl CVDFStreamer {
     }
 
     /// Generate a lightweight proof for a single squaring step
-    fn generate_single_step_proof(
+    pub fn generate_single_step_proof(
         &self,
         input: &QuadraticForm,
         output: &QuadraticForm,
@@ -608,7 +609,7 @@ impl CVDFStreamer {
     }
 
     /// Aggregate a chain of single-step proofs into a compact proof
-    fn aggregate_proof_chain(
+    pub fn aggregate_proof_chain(
         &self,
         proof_chain: Vec<CVDFStepProof>,
     ) -> Result<CVDFStepProof, CVDFError> {
@@ -805,7 +806,7 @@ mod tests {
         let starting_form = QuadraticForm::identity(&config.discriminant);
 
         // Test that excessive step counts are rejected
-        let result = streamer.compute_k_steps(&starting_form, 200_000);
+        let result = streamer.compute_k_steps(&starting_form, 2_000_000);
         assert!(result.is_err(), "Should reject excessive step counts");
 
         if let Err(CVDFError::ComputationError(msg)) = result {

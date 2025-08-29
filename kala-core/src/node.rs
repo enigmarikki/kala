@@ -11,8 +11,8 @@ use kala_rpc::{
     SubmitTransactionRequest, SubmitTransactionResponse,
 };
 use kala_state::{ChainState, StateDB, TickCertificate};
-use kala_transaction::{EncryptionContext, TimelockTransaction};
 use kala_tick::{CVDFConfig, CVDFStreamer};
+use kala_transaction::{EncryptionContext, TimelockTransaction};
 use serde_json;
 
 // RPC handler that communicates with the node via channels
@@ -55,14 +55,17 @@ impl KalaNode {
             ..CVDFConfig::default()
         };
         let mut cvdf_streamer = CVDFStreamer::new(cvdf_config);
-        
+
         // Initialize with starting form from state if available
         if let Some(form) = chain_state.get_starting_form() {
             if let Err(e) = cvdf_streamer.initialize(form) {
-                return Err(anyhow::anyhow!("Failed to initialize CVDF with form: {}", e));
+                return Err(anyhow::anyhow!(
+                    "Failed to initialize CVDF with form: {}",
+                    e
+                ));
             }
         }
-        
+
         let cvdf_streamer = Arc::new(RwLock::new(cvdf_streamer));
 
         // Create tick processor with proper parameters
@@ -261,7 +264,7 @@ impl KalaNode {
                     state.last_tick_hash = certificate.tick_hash;
                     state.total_transactions += certificate.transaction_count as u64;
 
-                    // Update CVDF checkpoint in state  
+                    // Update CVDF checkpoint in state
                     let cvdf = self.cvdf_streamer.read().await;
                     if let Ok(checkpoint) = cvdf.export_state() {
                         let (progress, _) = cvdf.get_progress().unwrap_or((0, 0));
@@ -390,13 +393,13 @@ impl KalaNode {
     async fn log_cvdf_checkpoint(&self) {
         let cvdf = self.cvdf_streamer.read().await;
         let (current_time, node_count) = cvdf.get_progress().unwrap_or((0, 0));
-        
+
         // Format all values first
         let title = "CVDF Checkpoint";
         let time_str = format!("Time: {}", current_time);
         let nodes_str = format!("Nodes: {}", node_count);
         let proof_str = "Proofs: Streaming Pietrzak";
-        
+
         // Calculate the box width based on the longest line
         let box_width = [
             title.len(),

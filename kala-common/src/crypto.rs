@@ -55,7 +55,7 @@ impl CryptoUtils {
 
     /// Validate public key format
     pub fn validate_pubkey(pubkey: &PublicKey) -> bool {
-        !pubkey.is_zero()
+        !PublicKeyExt::is_zero(pubkey)
     }
 
     /// Validate signature format
