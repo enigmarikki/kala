@@ -9,33 +9,42 @@ use aes_gcm::{
 use kala_common::prelude::{KalaError, KalaResult};
 use rand::Rng;
 use rug::{rand::RandState, Integer};
-use std::sync::Arc;
+use std::sync::{
+    atomic::{AtomicU32, AtomicU64, Ordering::SeqCst},
+    Arc,
+};
 use timelocks::Solver;
 
 /// Thread-safe encryption context
 #[derive(Clone)]
 pub struct EncryptionContext {
     /// Current tick for timelock calculations
-    current_tick: Arc<std::sync::atomic::AtomicU64>,
-    /// Tick size (k)
-    pub tick_size: u64,
+    current_tick: Arc<AtomicU64>,
+    hardness: Arc<AtomicU32>,
 }
 
 impl EncryptionContext {
-    pub fn new(tick_size: u64) -> Self {
+    pub fn new(hardness: u32) -> Self {
         Self {
-            current_tick: Arc::new(std::sync::atomic::AtomicU64::new(0)),
-            tick_size,
+            current_tick: Arc::new(AtomicU64::new(0)),
+            hardness: Arc::new(AtomicU32::new(hardness)),
         }
     }
 
     pub fn update_tick(&self, tick: u64) {
-        self.current_tick
-            .store(tick, std::sync::atomic::Ordering::SeqCst);
+        self.current_tick.store(tick, SeqCst);
+    }
+
+    pub fn update_hardness(&self, hardness: u32) {
+        self.hardness.store(hardness, SeqCst);
     }
 
     pub fn current_tick(&self) -> u64 {
-        self.current_tick.load(std::sync::atomic::Ordering::SeqCst)
+        self.current_tick.load(SeqCst)
+    }
+
+    pub fn current_hardness(&self) -> u32 {
+        self.hardness.load(SeqCst)
     }
 }
 
@@ -235,21 +244,9 @@ pub fn create_timelock_transaction(
     tx: &Transaction,
     ctx: &EncryptionContext,
     current_iteration: u64,
-    hardness_factor: f64, // 0.0 to 1.0, typically 0.1
 ) -> KalaResult<TimelockTransaction> {
     let current_tick = ctx.current_tick();
-    let tick_size = ctx.tick_size;
-
-    // Calculate remaining iterations in current tick
-    let tick_start = current_tick * tick_size;
-    let tick_end = (current_tick + 1) * tick_size;
-    let remaining = tick_end - current_iteration;
-
-    // Calculate hardness: min(k/10, remaining/2)
-    let max_hardness = (tick_size as f64 * hardness_factor) as u32;
-    let safe_hardness = (remaining / 2) as u32;
-    let hardness = max_hardness.min(safe_hardness).max(1);
-
+    let hardness = ctx.current_hardness();
     // Generate encryption key
     let mut key = [0u8; AES_KEY_SIZE];
     rand::thread_rng().fill(&mut key);
@@ -258,6 +255,7 @@ pub fn create_timelock_transaction(
     let encrypted_data = encrypt_transaction(tx, &key)?;
 
     // Create RSW puzzle
+    // FIX: Modului NEEDS TO BE PROTOCOL PARAM
     let timelock = RSWTimelock::new(2048)?;
     let puzzle = timelock.generate_puzzle(&key, hardness)?;
 
@@ -498,7 +496,7 @@ mod tests {
     #[test]
     fn test_encryption_context_initialization() {
         let ctx = EncryptionContext::new(1000);
-        assert_eq!(ctx.tick_size, 1000);
+        assert_eq!(ctx.current_hardness(), 1000);
         assert_eq!(ctx.current_tick(), 0);
     }
 
@@ -518,17 +516,32 @@ mod tests {
     }
 
     #[test]
+    fn test_encryption_context_hardness_update() {
+        let ctx = EncryptionContext::new(1000);
+        assert_eq!(ctx.current_hardness(), 1000);
+
+        ctx.update_hardness(2000);
+        assert_eq!(ctx.current_hardness(), 2000);
+
+        ctx.update_hardness(500);
+        assert_eq!(ctx.current_hardness(), 500);
+    }
+
+    #[test]
     fn test_encryption_context_clone() {
         let ctx1 = EncryptionContext::new(1000);
         ctx1.update_tick(5);
+        ctx1.update_hardness(1500);
 
         let ctx2 = ctx1.clone();
         assert_eq!(ctx2.current_tick(), 5);
-        assert_eq!(ctx2.tick_size, 1000);
+        assert_eq!(ctx2.current_hardness(), 1500);
 
         // Update ctx2 and verify ctx1 also sees the change (shared state)
         ctx2.update_tick(10);
+        ctx2.update_hardness(2000);
         assert_eq!(ctx1.current_tick(), 10);
+        assert_eq!(ctx1.current_hardness(), 2000);
     }
 
     #[test]
@@ -544,6 +557,7 @@ mod tests {
             let handle = thread::spawn(move || {
                 for j in 0..updates_per_thread {
                     ctx_clone.update_tick((i * updates_per_thread + j) as u64);
+                    ctx_clone.update_hardness(1000 + (i * j) as u32);
                     thread::sleep(Duration::from_micros(10));
                 }
             });
@@ -557,6 +571,10 @@ mod tests {
         // Final tick should be one of the values written
         let final_tick = ctx.current_tick();
         assert!(final_tick < (num_threads * updates_per_thread) as u64);
+
+        // Hardness should be within expected range
+        let final_hardness = ctx.current_hardness();
+        assert!(final_hardness >= 1000);
     }
 
     // ==================== RSW Timelock Tests ====================
@@ -653,7 +671,7 @@ mod tests {
         let batch_size = timelock.optimal_batch_size();
 
         assert!(batch_size > 0);
-        assert_eq!(batch_size <= 20000, true);
+        assert!(batch_size <= 20000);
     }
 
     #[test]
@@ -668,58 +686,42 @@ mod tests {
     #[test]
     fn test_create_timelock_transaction() {
         let tx = create_test_transactions()[0].clone();
-        let ctx = EncryptionContext::new(1000);
+        let ctx = EncryptionContext::new(100); // Set hardness to 100
         ctx.update_tick(5);
 
         let current_iteration = 4500;
-        let hardness_factor = 0.1;
 
-        let timelock_tx =
-            create_timelock_transaction(&tx, &ctx, current_iteration, hardness_factor).unwrap();
+        let timelock_tx = create_timelock_transaction(&tx, &ctx, current_iteration).unwrap();
 
         assert_eq!(timelock_tx.submission_iteration, current_iteration);
         assert_eq!(timelock_tx.target_tick, 5);
         assert!(!timelock_tx.encrypted_data.ciphertext.is_empty());
         assert!(!timelock_tx.puzzle.n.is_empty());
+        assert_eq!(timelock_tx.puzzle.hardness, 100); // Should use context's hardness
     }
 
     #[test]
-    fn test_timelock_transaction_hardness_calculation() {
+    fn test_create_timelock_with_different_hardness() {
         let tx = create_test_transactions()[0].clone();
-        let ctx = EncryptionContext::new(1000);
+        let ctx = EncryptionContext::new(50);
+        ctx.update_tick(10);
 
-        // Test case 1: Beginning of tick
-        ctx.update_tick(5);
-        let timelock_tx = create_timelock_transaction(
-            &tx, &ctx, 5000, // Start of tick 5
-            0.1,
-        )
-        .unwrap();
+        let timelock_tx = create_timelock_transaction(&tx, &ctx, 1000).unwrap();
+        assert_eq!(timelock_tx.puzzle.hardness, 50);
 
-        // Hardness should be min(100, 500) = 100
-        assert!(timelock_tx.puzzle.hardness <= 100);
-
-        // Test case 2: Near end of tick
-        let timelock_tx2 = create_timelock_transaction(
-            &tx, &ctx, 5990, // Near end of tick 5
-            0.1,
-        )
-        .unwrap();
-
-        // Hardness should be min(100, 5) = 5
-        assert!(timelock_tx2.puzzle.hardness <= 5);
+        // Update hardness and create another
+        ctx.update_hardness(200);
+        let timelock_tx2 = create_timelock_transaction(&tx, &ctx, 2000).unwrap();
+        assert_eq!(timelock_tx2.puzzle.hardness, 200);
     }
 
     #[test]
     fn test_decrypt_timelock_transaction() {
         let tx = create_test_transactions()[0].clone();
-        let ctx = EncryptionContext::new(1000);
+        let ctx = EncryptionContext::new(10); // Very small hardness for faster test
         ctx.update_tick(1);
 
-        let timelock_tx = create_timelock_transaction(
-            &tx, &ctx, 500, 0.01, // Very small hardness for faster test
-        )
-        .unwrap();
+        let timelock_tx = create_timelock_transaction(&tx, &ctx, 500).unwrap();
 
         let decrypted = decrypt_timelock_transaction(&timelock_tx).unwrap();
 
@@ -727,6 +729,7 @@ mod tests {
             (Transaction::Send(a), Transaction::Send(b)) => {
                 assert_eq!(a.amount, b.amount);
                 assert_eq!(a.sender, b.sender);
+                assert_eq!(a.receiver, b.receiver);
             }
             _ => panic!("Transaction type mismatch"),
         }
@@ -735,19 +738,13 @@ mod tests {
     #[test]
     fn test_decrypt_timelock_batch() {
         let transactions = create_test_transactions();
-        let ctx = EncryptionContext::new(1000);
+        let ctx = EncryptionContext::new(10); // Very small hardness for faster test
         ctx.update_tick(1);
 
         let mut timelock_txs = Vec::new();
 
         for (i, tx) in transactions.iter().enumerate() {
-            let timelock_tx = create_timelock_transaction(
-                tx,
-                &ctx,
-                500 + i as u64,
-                0.01, // Very small hardness for faster test
-            )
-            .unwrap();
+            let timelock_tx = create_timelock_transaction(tx, &ctx, 500 + i as u64).unwrap();
             timelock_txs.push(timelock_tx);
         }
 
@@ -775,43 +772,36 @@ mod tests {
     }
 
     #[test]
-    fn test_zero_hardness_factor() {
-        let tx = create_test_transactions()[0].clone();
-        let ctx = EncryptionContext::new(1000);
+    fn test_minimum_hardness() {
+        let ctx = EncryptionContext::new(1); // Minimum hardness
         ctx.update_tick(1);
 
-        let result = create_timelock_transaction(
-            &tx, &ctx, 500, 0.0, // Zero hardness factor
-        );
+        let tx = create_test_transactions()[0].clone();
+        let result = create_timelock_transaction(&tx, &ctx, 500);
 
-        // Should still work, with minimum hardness of 1
         assert!(result.is_ok());
         let timelock_tx = result.unwrap();
-        assert!(timelock_tx.puzzle.hardness >= 1);
+        assert_eq!(timelock_tx.puzzle.hardness, 1);
     }
 
     #[test]
-    fn test_maximum_hardness_factor() {
-        let tx = create_test_transactions()[0].clone();
-        let ctx = EncryptionContext::new(1000);
+    fn test_maximum_hardness() {
+        let ctx = EncryptionContext::new(10000); // Large hardness
         ctx.update_tick(1);
 
-        let result = create_timelock_transaction(
-            &tx, &ctx, 1000, // Start of tick
-            1.0,  // Maximum hardness factor
-        );
+        let tx = create_test_transactions()[0].clone();
+        let result = create_timelock_transaction(&tx, &ctx, 1000);
 
         assert!(result.is_ok());
         let timelock_tx = result.unwrap();
-        // Hardness should be min(1000, 500) = 500
-        assert!(timelock_tx.puzzle.hardness <= 500);
+        assert_eq!(timelock_tx.puzzle.hardness, 10000);
     }
 
     #[test]
     fn test_large_transaction() {
         // Create a transaction with maximum signature size
         let mut large_signature = Vec::new();
-        large_signature.resize(64, 0u8); // Large signature
+        large_signature.resize(64, 0u8);
 
         let tx = Transaction::Send(Send {
             sender: [1u8; 32],
@@ -875,7 +865,6 @@ mod tests {
     }
 
     #[test]
-
     fn test_concurrent_encryption_stress() {
         let num_threads = 20;
         let ops_per_thread = 100;
@@ -926,5 +915,46 @@ mod tests {
             }
             _ => panic!("Transaction type mismatch"),
         }
+    }
+
+    #[test]
+    fn test_concurrent_context_updates() {
+        let ctx = Arc::new(EncryptionContext::new(1000));
+        let num_threads = 10;
+
+        let mut handles = vec![];
+
+        // Spawn threads that update tick
+        for i in 0..num_threads / 2 {
+            let ctx_clone = Arc::clone(&ctx);
+            let handle = thread::spawn(move || {
+                for j in 0..100 {
+                    ctx_clone.update_tick((i * 100 + j) as u64);
+                    thread::sleep(Duration::from_micros(10));
+                }
+            });
+            handles.push(handle);
+        }
+
+        // Spawn threads that update hardness
+        for i in 0..num_threads / 2 {
+            let ctx_clone = Arc::clone(&ctx);
+            let handle = thread::spawn(move || {
+                for j in 0..100 {
+                    ctx_clone.update_hardness(1000 + (i * 100 + j) as u32);
+                    thread::sleep(Duration::from_micros(10));
+                }
+            });
+            handles.push(handle);
+        }
+
+        for handle in handles {
+            handle.join().unwrap();
+        }
+
+        // Values should be within expected ranges
+        assert!(ctx.current_tick() < 1000);
+        assert!(ctx.current_hardness() >= 1000);
+        assert!(ctx.current_hardness() < 2000);
     }
 }
