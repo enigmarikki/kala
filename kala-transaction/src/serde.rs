@@ -364,7 +364,7 @@ pub fn flatbuffer_to_transaction(bytes: &[u8]) -> KalaResult<Transaction> {
             }
             _ => {
                 return Err(KalaError::validation(
-                    "Unknown transaction type".to_string(),
+                    "Invalid transaction type".to_string(),
                 ))
             }
         };
@@ -674,11 +674,7 @@ mod tests {
         match result {
             Err(e) => {
                 let error_msg = format!("{}", e);
-                assert!(
-                    error_msg.contains("Failed to parse"),
-                    "Unexpected error message: {}",
-                    error_msg
-                );
+                assert!(error_msg.contains("Invalid transaction"));
             }
             Ok(_) => panic!("Should not successfully parse invalid data"),
         }
