@@ -10,7 +10,7 @@ fn create_test_config(discriminant_bits: u32) -> CVDFConfig {
         discriminant: Discriminant::generate(discriminant_bits)
             .expect("Should generate discriminant"),
         security_param: 128,
-        tree_arity: 4,
+        tree_arity: 1024,
         base_difficulty: 1, // Keep low for benchmarking
     }
 }
@@ -278,7 +278,7 @@ fn bench_frontier_operations(c: &mut Criterion) {
 fn bench_realistic_workflow(c: &mut Criterion) {
     c.bench_function("realistic_workflow", |b| {
         b.iter(|| {
-            let config = create_test_config(512);
+            let config = create_test_config(1024);
             let mut streamer = CVDFStreamer::new(config.clone());
             let starting_form = QuadraticForm::identity(&config.discriminant);
 
@@ -286,7 +286,7 @@ fn bench_realistic_workflow(c: &mut Criterion) {
             streamer.initialize(starting_form.clone()).unwrap();
 
             // Perform some single steps
-            for _ in 0..5 {
+            for _ in 0..65536 {
                 streamer.compute_single_step(&starting_form).unwrap();
             }
 
@@ -311,15 +311,15 @@ fn bench_realistic_workflow(c: &mut Criterion) {
 
 criterion_group!(
     benches,
-    bench_single_step,
-    bench_k_steps,
-    bench_single_step_proof_generation,
-    bench_proof_aggregation,
-    bench_class_group_operations,
-    bench_pietrzak_proof,
-    bench_state_management,
-    bench_stream_computation,
-    bench_frontier_operations,
+    //bench_single_step,
+    //bench_k_steps,
+    //bench_single_step_proof_generation,
+    //bench_proof_aggregation,
+    //bench_class_group_operations,
+    //bench_pietrzak_proof,
+    //bench_state_management,
+    //bench_stream_computation,
+    //bench_frontier_operations,
     bench_realistic_workflow
 );
 

@@ -14,8 +14,6 @@ use crate::serialization::{EncodingType, KalaSerialize, NetworkMessage};
 /// Network protocol version
 pub const PROTOCOL_VERSION: u32 = 1;
 
-/// Maximum message size (16MB)
-/// Re-exported from [`crate::types::network`] to avoid duplication.
 pub use crate::types::network::MAX_MESSAGE_SIZE;
 
 /// Network node identifier
@@ -75,7 +73,7 @@ pub struct NetworkConfig {
 impl Default for NetworkConfig {
     fn default() -> Self {
         Self {
-            listen_address: "0.0.0.0:8080".to_string(),
+            listen_address: "0.0.0.0:1719".to_string(),
             max_peers: 100,
             connection_timeout: Duration::from_secs(30),
             keepalive_interval: Duration::from_secs(60),

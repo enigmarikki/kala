@@ -8,7 +8,7 @@ license.workspace = true
 [dependencies]
 # Workspace dependencies
 kala-common = { workspace = true }
-timelocks = { workspace = true }
+kala-timelocks = { workspace = true }
 flatbuffers = { workspace = true }
 serde = { workspace = true }
 anyhow = { workspace = true }

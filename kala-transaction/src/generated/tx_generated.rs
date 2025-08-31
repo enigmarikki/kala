@@ -26,17 +26,19 @@ pub mod tx {
         since = "2.0.0",
         note = "Use associated constants instead. This will no longer be generated in 2021."
     )]
-    pub const ENUM_MAX_TX_BODY: u8 = 4;
+    pub const ENUM_MAX_TX_BODY: u8 = 6;
     #[deprecated(
         since = "2.0.0",
         note = "Use associated constants instead. This will no longer be generated in 2021."
     )]
     #[allow(non_camel_case_types)]
-    pub const ENUM_VALUES_TX_BODY: [TxBody; 5] = [
+    pub const ENUM_VALUES_TX_BODY: [TxBody; 7] = [
         TxBody::NONE,
         TxBody::SendTx,
         TxBody::MintTx,
+        TxBody::BurnTx,
         TxBody::StakeTx,
+        TxBody::UnstakeTx,
         TxBody::SolveTx,
     ];
 
@@ -48,16 +50,20 @@ pub mod tx {
         pub const NONE: Self = Self(0);
         pub const SendTx: Self = Self(1);
         pub const MintTx: Self = Self(2);
-        pub const StakeTx: Self = Self(3);
-        pub const SolveTx: Self = Self(4);
+        pub const BurnTx: Self = Self(3);
+        pub const StakeTx: Self = Self(4);
+        pub const UnstakeTx: Self = Self(5);
+        pub const SolveTx: Self = Self(6);
 
         pub const ENUM_MIN: u8 = 0;
-        pub const ENUM_MAX: u8 = 4;
+        pub const ENUM_MAX: u8 = 6;
         pub const ENUM_VALUES: &'static [Self] = &[
             Self::NONE,
             Self::SendTx,
             Self::MintTx,
+            Self::BurnTx,
             Self::StakeTx,
+            Self::UnstakeTx,
             Self::SolveTx,
         ];
         /// Returns the variant's name or "" if unknown.
@@ -66,7 +72,9 @@ pub mod tx {
                 Self::NONE => Some("NONE"),
                 Self::SendTx => Some("SendTx"),
                 Self::MintTx => Some("MintTx"),
+                Self::BurnTx => Some("BurnTx"),
                 Self::StakeTx => Some("StakeTx"),
+                Self::UnstakeTx => Some("UnstakeTx"),
                 Self::SolveTx => Some("SolveTx"),
                 _ => None,
             }
@@ -1151,6 +1159,257 @@ pub mod tx {
             ds.finish()
         }
     }
+    pub enum BurnTxOffset {}
+    #[derive(Copy, Clone, PartialEq)]
+
+    pub struct BurnTx<'a> {
+        pub _tab: flatbuffers::Table<'a>,
+    }
+
+    impl<'a> flatbuffers::Follow<'a> for BurnTx<'a> {
+        type Inner = BurnTx<'a>;
+        #[inline]
+        unsafe fn follow(buf: &'a [u8], loc: usize) -> Self::Inner {
+            Self {
+                _tab: flatbuffers::Table::new(buf, loc),
+            }
+        }
+    }
+
+    impl<'a> BurnTx<'a> {
+        pub const VT_SENDER: flatbuffers::VOffsetT = 4;
+        pub const VT_AMOUNT: flatbuffers::VOffsetT = 6;
+        pub const VT_DENOM: flatbuffers::VOffsetT = 8;
+        pub const VT_NONCE: flatbuffers::VOffsetT = 10;
+        pub const VT_SIGNATURE: flatbuffers::VOffsetT = 12;
+        pub const VT_GAS_SPONSORER: flatbuffers::VOffsetT = 14;
+
+        #[inline]
+        pub unsafe fn init_from_table(table: flatbuffers::Table<'a>) -> Self {
+            BurnTx { _tab: table }
+        }
+        #[allow(unused_mut)]
+        pub fn create<
+            'bldr: 'args,
+            'args: 'mut_bldr,
+            'mut_bldr,
+            A: flatbuffers::Allocator + 'bldr,
+        >(
+            _fbb: &'mut_bldr mut flatbuffers::FlatBufferBuilder<'bldr, A>,
+            args: &'args BurnTxArgs<'args>,
+        ) -> flatbuffers::WIPOffset<BurnTx<'bldr>> {
+            let mut builder = BurnTxBuilder::new(_fbb);
+            builder.add_nonce(args.nonce);
+            builder.add_amount(args.amount);
+            if let Some(x) = args.gas_sponsorer {
+                builder.add_gas_sponsorer(x);
+            }
+            if let Some(x) = args.signature {
+                builder.add_signature(x);
+            }
+            if let Some(x) = args.denom {
+                builder.add_denom(x);
+            }
+            if let Some(x) = args.sender {
+                builder.add_sender(x);
+            }
+            builder.finish()
+        }
+
+        #[inline]
+        pub fn sender(&self) -> Option<flatbuffers::Vector<'a, u8>> {
+            // Safety:
+            // Created from valid Table for this object
+            // which contains a valid value in this slot
+            unsafe {
+                self._tab
+                    .get::<flatbuffers::ForwardsUOffset<flatbuffers::Vector<'a, u8>>>(
+                        BurnTx::VT_SENDER,
+                        None,
+                    )
+            }
+        }
+        #[inline]
+        pub fn amount(&self) -> u64 {
+            // Safety:
+            // Created from valid Table for this object
+            // which contains a valid value in this slot
+            unsafe { self._tab.get::<u64>(BurnTx::VT_AMOUNT, Some(0)).unwrap() }
+        }
+        #[inline]
+        pub fn denom(&self) -> Option<flatbuffers::Vector<'a, u8>> {
+            // Safety:
+            // Created from valid Table for this object
+            // which contains a valid value in this slot
+            unsafe {
+                self._tab
+                    .get::<flatbuffers::ForwardsUOffset<flatbuffers::Vector<'a, u8>>>(
+                        BurnTx::VT_DENOM,
+                        None,
+                    )
+            }
+        }
+        #[inline]
+        pub fn nonce(&self) -> u64 {
+            // Safety:
+            // Created from valid Table for this object
+            // which contains a valid value in this slot
+            unsafe { self._tab.get::<u64>(BurnTx::VT_NONCE, Some(0)).unwrap() }
+        }
+        #[inline]
+        pub fn signature(&self) -> Option<flatbuffers::Vector<'a, u8>> {
+            // Safety:
+            // Created from valid Table for this object
+            // which contains a valid value in this slot
+            unsafe {
+                self._tab
+                    .get::<flatbuffers::ForwardsUOffset<flatbuffers::Vector<'a, u8>>>(
+                        BurnTx::VT_SIGNATURE,
+                        None,
+                    )
+            }
+        }
+        #[inline]
+        pub fn gas_sponsorer(&self) -> Option<flatbuffers::Vector<'a, u8>> {
+            // Safety:
+            // Created from valid Table for this object
+            // which contains a valid value in this slot
+            unsafe {
+                self._tab
+                    .get::<flatbuffers::ForwardsUOffset<flatbuffers::Vector<'a, u8>>>(
+                        BurnTx::VT_GAS_SPONSORER,
+                        None,
+                    )
+            }
+        }
+    }
+
+    impl flatbuffers::Verifiable for BurnTx<'_> {
+        #[inline]
+        fn run_verifier(
+            v: &mut flatbuffers::Verifier,
+            pos: usize,
+        ) -> Result<(), flatbuffers::InvalidFlatbuffer> {
+            use self::flatbuffers::Verifiable;
+            v.visit_table(pos)?
+                .visit_field::<flatbuffers::ForwardsUOffset<flatbuffers::Vector<'_, u8>>>(
+                    "sender",
+                    Self::VT_SENDER,
+                    false,
+                )?
+                .visit_field::<u64>("amount", Self::VT_AMOUNT, false)?
+                .visit_field::<flatbuffers::ForwardsUOffset<flatbuffers::Vector<'_, u8>>>(
+                    "denom",
+                    Self::VT_DENOM,
+                    false,
+                )?
+                .visit_field::<u64>("nonce", Self::VT_NONCE, false)?
+                .visit_field::<flatbuffers::ForwardsUOffset<flatbuffers::Vector<'_, u8>>>(
+                    "signature",
+                    Self::VT_SIGNATURE,
+                    false,
+                )?
+                .visit_field::<flatbuffers::ForwardsUOffset<flatbuffers::Vector<'_, u8>>>(
+                    "gas_sponsorer",
+                    Self::VT_GAS_SPONSORER,
+                    false,
+                )?
+                .finish();
+            Ok(())
+        }
+    }
+    pub struct BurnTxArgs<'a> {
+        pub sender: Option<flatbuffers::WIPOffset<flatbuffers::Vector<'a, u8>>>,
+        pub amount: u64,
+        pub denom: Option<flatbuffers::WIPOffset<flatbuffers::Vector<'a, u8>>>,
+        pub nonce: u64,
+        pub signature: Option<flatbuffers::WIPOffset<flatbuffers::Vector<'a, u8>>>,
+        pub gas_sponsorer: Option<flatbuffers::WIPOffset<flatbuffers::Vector<'a, u8>>>,
+    }
+    impl<'a> Default for BurnTxArgs<'a> {
+        #[inline]
+        fn default() -> Self {
+            BurnTxArgs {
+                sender: None,
+                amount: 0,
+                denom: None,
+                nonce: 0,
+                signature: None,
+                gas_sponsorer: None,
+            }
+        }
+    }
+
+    pub struct BurnTxBuilder<'a: 'b, 'b, A: flatbuffers::Allocator + 'a> {
+        fbb_: &'b mut flatbuffers::FlatBufferBuilder<'a, A>,
+        start_: flatbuffers::WIPOffset<flatbuffers::TableUnfinishedWIPOffset>,
+    }
+    impl<'a: 'b, 'b, A: flatbuffers::Allocator + 'a> BurnTxBuilder<'a, 'b, A> {
+        #[inline]
+        pub fn add_sender(&mut self, sender: flatbuffers::WIPOffset<flatbuffers::Vector<'b, u8>>) {
+            self.fbb_
+                .push_slot_always::<flatbuffers::WIPOffset<_>>(BurnTx::VT_SENDER, sender);
+        }
+        #[inline]
+        pub fn add_amount(&mut self, amount: u64) {
+            self.fbb_.push_slot::<u64>(BurnTx::VT_AMOUNT, amount, 0);
+        }
+        #[inline]
+        pub fn add_denom(&mut self, denom: flatbuffers::WIPOffset<flatbuffers::Vector<'b, u8>>) {
+            self.fbb_
+                .push_slot_always::<flatbuffers::WIPOffset<_>>(BurnTx::VT_DENOM, denom);
+        }
+        #[inline]
+        pub fn add_nonce(&mut self, nonce: u64) {
+            self.fbb_.push_slot::<u64>(BurnTx::VT_NONCE, nonce, 0);
+        }
+        #[inline]
+        pub fn add_signature(
+            &mut self,
+            signature: flatbuffers::WIPOffset<flatbuffers::Vector<'b, u8>>,
+        ) {
+            self.fbb_
+                .push_slot_always::<flatbuffers::WIPOffset<_>>(BurnTx::VT_SIGNATURE, signature);
+        }
+        #[inline]
+        pub fn add_gas_sponsorer(
+            &mut self,
+            gas_sponsorer: flatbuffers::WIPOffset<flatbuffers::Vector<'b, u8>>,
+        ) {
+            self.fbb_.push_slot_always::<flatbuffers::WIPOffset<_>>(
+                BurnTx::VT_GAS_SPONSORER,
+                gas_sponsorer,
+            );
+        }
+        #[inline]
+        pub fn new(
+            _fbb: &'b mut flatbuffers::FlatBufferBuilder<'a, A>,
+        ) -> BurnTxBuilder<'a, 'b, A> {
+            let start = _fbb.start_table();
+            BurnTxBuilder {
+                fbb_: _fbb,
+                start_: start,
+            }
+        }
+        #[inline]
+        pub fn finish(self) -> flatbuffers::WIPOffset<BurnTx<'a>> {
+            let o = self.fbb_.end_table(self.start_);
+            flatbuffers::WIPOffset::new(o.value())
+        }
+    }
+
+    impl core::fmt::Debug for BurnTx<'_> {
+        fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+            let mut ds = f.debug_struct("BurnTx");
+            ds.field("sender", &self.sender());
+            ds.field("amount", &self.amount());
+            ds.field("denom", &self.denom());
+            ds.field("nonce", &self.nonce());
+            ds.field("signature", &self.signature());
+            ds.field("gas_sponsorer", &self.gas_sponsorer());
+            ds.finish()
+        }
+    }
     pub enum StakeTxOffset {}
     #[derive(Copy, Clone, PartialEq)]
 
@@ -1169,8 +1428,8 @@ pub mod tx {
     }
 
     impl<'a> StakeTx<'a> {
-        pub const VT_SENDER: flatbuffers::VOffsetT = 4;
-        pub const VT_DELEGATION_RECEIVER: flatbuffers::VOffsetT = 6;
+        pub const VT_DELEGATOR: flatbuffers::VOffsetT = 4;
+        pub const VT_WITNESS: flatbuffers::VOffsetT = 6;
         pub const VT_AMOUNT: flatbuffers::VOffsetT = 8;
         pub const VT_NONCE: flatbuffers::VOffsetT = 10;
         pub const VT_SIGNATURE: flatbuffers::VOffsetT = 12;
@@ -1199,37 +1458,37 @@ pub mod tx {
             if let Some(x) = args.signature {
                 builder.add_signature(x);
             }
-            if let Some(x) = args.delegation_receiver {
-                builder.add_delegation_receiver(x);
+            if let Some(x) = args.witness {
+                builder.add_witness(x);
             }
-            if let Some(x) = args.sender {
-                builder.add_sender(x);
+            if let Some(x) = args.delegator {
+                builder.add_delegator(x);
             }
             builder.finish()
         }
 
         #[inline]
-        pub fn sender(&self) -> Option<flatbuffers::Vector<'a, u8>> {
+        pub fn delegator(&self) -> Option<flatbuffers::Vector<'a, u8>> {
             // Safety:
             // Created from valid Table for this object
             // which contains a valid value in this slot
             unsafe {
                 self._tab
                     .get::<flatbuffers::ForwardsUOffset<flatbuffers::Vector<'a, u8>>>(
-                        StakeTx::VT_SENDER,
+                        StakeTx::VT_DELEGATOR,
                         None,
                     )
             }
         }
         #[inline]
-        pub fn delegation_receiver(&self) -> Option<flatbuffers::Vector<'a, u8>> {
+        pub fn witness(&self) -> Option<flatbuffers::Vector<'a, u8>> {
             // Safety:
             // Created from valid Table for this object
             // which contains a valid value in this slot
             unsafe {
                 self._tab
                     .get::<flatbuffers::ForwardsUOffset<flatbuffers::Vector<'a, u8>>>(
-                        StakeTx::VT_DELEGATION_RECEIVER,
+                        StakeTx::VT_WITNESS,
                         None,
                     )
             }
@@ -1285,13 +1544,13 @@ pub mod tx {
             use self::flatbuffers::Verifiable;
             v.visit_table(pos)?
                 .visit_field::<flatbuffers::ForwardsUOffset<flatbuffers::Vector<'_, u8>>>(
-                    "sender",
-                    Self::VT_SENDER,
+                    "delegator",
+                    Self::VT_DELEGATOR,
                     false,
                 )?
                 .visit_field::<flatbuffers::ForwardsUOffset<flatbuffers::Vector<'_, u8>>>(
-                    "delegation_receiver",
-                    Self::VT_DELEGATION_RECEIVER,
+                    "witness",
+                    Self::VT_WITNESS,
                     false,
                 )?
                 .visit_field::<u64>("amount", Self::VT_AMOUNT, false)?
@@ -1311,8 +1570,8 @@ pub mod tx {
         }
     }
     pub struct StakeTxArgs<'a> {
-        pub sender: Option<flatbuffers::WIPOffset<flatbuffers::Vector<'a, u8>>>,
-        pub delegation_receiver: Option<flatbuffers::WIPOffset<flatbuffers::Vector<'a, u8>>>,
+        pub delegator: Option<flatbuffers::WIPOffset<flatbuffers::Vector<'a, u8>>>,
+        pub witness: Option<flatbuffers::WIPOffset<flatbuffers::Vector<'a, u8>>>,
         pub amount: u64,
         pub nonce: u64,
         pub signature: Option<flatbuffers::WIPOffset<flatbuffers::Vector<'a, u8>>>,
@@ -1322,8 +1581,8 @@ pub mod tx {
         #[inline]
         fn default() -> Self {
             StakeTxArgs {
-                sender: None,
-                delegation_receiver: None,
+                delegator: None,
+                witness: None,
                 amount: 0,
                 nonce: 0,
                 signature: None,
@@ -1338,19 +1597,20 @@ pub mod tx {
     }
     impl<'a: 'b, 'b, A: flatbuffers::Allocator + 'a> StakeTxBuilder<'a, 'b, A> {
         #[inline]
-        pub fn add_sender(&mut self, sender: flatbuffers::WIPOffset<flatbuffers::Vector<'b, u8>>) {
+        pub fn add_delegator(
+            &mut self,
+            delegator: flatbuffers::WIPOffset<flatbuffers::Vector<'b, u8>>,
+        ) {
             self.fbb_
-                .push_slot_always::<flatbuffers::WIPOffset<_>>(StakeTx::VT_SENDER, sender);
+                .push_slot_always::<flatbuffers::WIPOffset<_>>(StakeTx::VT_DELEGATOR, delegator);
         }
         #[inline]
-        pub fn add_delegation_receiver(
+        pub fn add_witness(
             &mut self,
-            delegation_receiver: flatbuffers::WIPOffset<flatbuffers::Vector<'b, u8>>,
+            witness: flatbuffers::WIPOffset<flatbuffers::Vector<'b, u8>>,
         ) {
-            self.fbb_.push_slot_always::<flatbuffers::WIPOffset<_>>(
-                StakeTx::VT_DELEGATION_RECEIVER,
-                delegation_receiver,
-            );
+            self.fbb_
+                .push_slot_always::<flatbuffers::WIPOffset<_>>(StakeTx::VT_WITNESS, witness);
         }
         #[inline]
         pub fn add_amount(&mut self, amount: u64) {
@@ -1398,8 +1658,265 @@ pub mod tx {
     impl core::fmt::Debug for StakeTx<'_> {
         fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
             let mut ds = f.debug_struct("StakeTx");
-            ds.field("sender", &self.sender());
-            ds.field("delegation_receiver", &self.delegation_receiver());
+            ds.field("delegator", &self.delegator());
+            ds.field("witness", &self.witness());
+            ds.field("amount", &self.amount());
+            ds.field("nonce", &self.nonce());
+            ds.field("signature", &self.signature());
+            ds.field("gas_sponsorer", &self.gas_sponsorer());
+            ds.finish()
+        }
+    }
+    pub enum UnstakeTxOffset {}
+    #[derive(Copy, Clone, PartialEq)]
+
+    pub struct UnstakeTx<'a> {
+        pub _tab: flatbuffers::Table<'a>,
+    }
+
+    impl<'a> flatbuffers::Follow<'a> for UnstakeTx<'a> {
+        type Inner = UnstakeTx<'a>;
+        #[inline]
+        unsafe fn follow(buf: &'a [u8], loc: usize) -> Self::Inner {
+            Self {
+                _tab: flatbuffers::Table::new(buf, loc),
+            }
+        }
+    }
+
+    impl<'a> UnstakeTx<'a> {
+        pub const VT_DELEGATOR: flatbuffers::VOffsetT = 4;
+        pub const VT_WITNESS: flatbuffers::VOffsetT = 6;
+        pub const VT_AMOUNT: flatbuffers::VOffsetT = 8;
+        pub const VT_NONCE: flatbuffers::VOffsetT = 10;
+        pub const VT_SIGNATURE: flatbuffers::VOffsetT = 12;
+        pub const VT_GAS_SPONSORER: flatbuffers::VOffsetT = 14;
+
+        #[inline]
+        pub unsafe fn init_from_table(table: flatbuffers::Table<'a>) -> Self {
+            UnstakeTx { _tab: table }
+        }
+        #[allow(unused_mut)]
+        pub fn create<
+            'bldr: 'args,
+            'args: 'mut_bldr,
+            'mut_bldr,
+            A: flatbuffers::Allocator + 'bldr,
+        >(
+            _fbb: &'mut_bldr mut flatbuffers::FlatBufferBuilder<'bldr, A>,
+            args: &'args UnstakeTxArgs<'args>,
+        ) -> flatbuffers::WIPOffset<UnstakeTx<'bldr>> {
+            let mut builder = UnstakeTxBuilder::new(_fbb);
+            builder.add_nonce(args.nonce);
+            builder.add_amount(args.amount);
+            if let Some(x) = args.gas_sponsorer {
+                builder.add_gas_sponsorer(x);
+            }
+            if let Some(x) = args.signature {
+                builder.add_signature(x);
+            }
+            if let Some(x) = args.witness {
+                builder.add_witness(x);
+            }
+            if let Some(x) = args.delegator {
+                builder.add_delegator(x);
+            }
+            builder.finish()
+        }
+
+        #[inline]
+        pub fn delegator(&self) -> Option<flatbuffers::Vector<'a, u8>> {
+            // Safety:
+            // Created from valid Table for this object
+            // which contains a valid value in this slot
+            unsafe {
+                self._tab
+                    .get::<flatbuffers::ForwardsUOffset<flatbuffers::Vector<'a, u8>>>(
+                        UnstakeTx::VT_DELEGATOR,
+                        None,
+                    )
+            }
+        }
+        #[inline]
+        pub fn witness(&self) -> Option<flatbuffers::Vector<'a, u8>> {
+            // Safety:
+            // Created from valid Table for this object
+            // which contains a valid value in this slot
+            unsafe {
+                self._tab
+                    .get::<flatbuffers::ForwardsUOffset<flatbuffers::Vector<'a, u8>>>(
+                        UnstakeTx::VT_WITNESS,
+                        None,
+                    )
+            }
+        }
+        #[inline]
+        pub fn amount(&self) -> u64 {
+            // Safety:
+            // Created from valid Table for this object
+            // which contains a valid value in this slot
+            unsafe { self._tab.get::<u64>(UnstakeTx::VT_AMOUNT, Some(0)).unwrap() }
+        }
+        #[inline]
+        pub fn nonce(&self) -> u64 {
+            // Safety:
+            // Created from valid Table for this object
+            // which contains a valid value in this slot
+            unsafe { self._tab.get::<u64>(UnstakeTx::VT_NONCE, Some(0)).unwrap() }
+        }
+        #[inline]
+        pub fn signature(&self) -> Option<flatbuffers::Vector<'a, u8>> {
+            // Safety:
+            // Created from valid Table for this object
+            // which contains a valid value in this slot
+            unsafe {
+                self._tab
+                    .get::<flatbuffers::ForwardsUOffset<flatbuffers::Vector<'a, u8>>>(
+                        UnstakeTx::VT_SIGNATURE,
+                        None,
+                    )
+            }
+        }
+        #[inline]
+        pub fn gas_sponsorer(&self) -> Option<flatbuffers::Vector<'a, u8>> {
+            // Safety:
+            // Created from valid Table for this object
+            // which contains a valid value in this slot
+            unsafe {
+                self._tab
+                    .get::<flatbuffers::ForwardsUOffset<flatbuffers::Vector<'a, u8>>>(
+                        UnstakeTx::VT_GAS_SPONSORER,
+                        None,
+                    )
+            }
+        }
+    }
+
+    impl flatbuffers::Verifiable for UnstakeTx<'_> {
+        #[inline]
+        fn run_verifier(
+            v: &mut flatbuffers::Verifier,
+            pos: usize,
+        ) -> Result<(), flatbuffers::InvalidFlatbuffer> {
+            use self::flatbuffers::Verifiable;
+            v.visit_table(pos)?
+                .visit_field::<flatbuffers::ForwardsUOffset<flatbuffers::Vector<'_, u8>>>(
+                    "delegator",
+                    Self::VT_DELEGATOR,
+                    false,
+                )?
+                .visit_field::<flatbuffers::ForwardsUOffset<flatbuffers::Vector<'_, u8>>>(
+                    "witness",
+                    Self::VT_WITNESS,
+                    false,
+                )?
+                .visit_field::<u64>("amount", Self::VT_AMOUNT, false)?
+                .visit_field::<u64>("nonce", Self::VT_NONCE, false)?
+                .visit_field::<flatbuffers::ForwardsUOffset<flatbuffers::Vector<'_, u8>>>(
+                    "signature",
+                    Self::VT_SIGNATURE,
+                    false,
+                )?
+                .visit_field::<flatbuffers::ForwardsUOffset<flatbuffers::Vector<'_, u8>>>(
+                    "gas_sponsorer",
+                    Self::VT_GAS_SPONSORER,
+                    false,
+                )?
+                .finish();
+            Ok(())
+        }
+    }
+    pub struct UnstakeTxArgs<'a> {
+        pub delegator: Option<flatbuffers::WIPOffset<flatbuffers::Vector<'a, u8>>>,
+        pub witness: Option<flatbuffers::WIPOffset<flatbuffers::Vector<'a, u8>>>,
+        pub amount: u64,
+        pub nonce: u64,
+        pub signature: Option<flatbuffers::WIPOffset<flatbuffers::Vector<'a, u8>>>,
+        pub gas_sponsorer: Option<flatbuffers::WIPOffset<flatbuffers::Vector<'a, u8>>>,
+    }
+    impl<'a> Default for UnstakeTxArgs<'a> {
+        #[inline]
+        fn default() -> Self {
+            UnstakeTxArgs {
+                delegator: None,
+                witness: None,
+                amount: 0,
+                nonce: 0,
+                signature: None,
+                gas_sponsorer: None,
+            }
+        }
+    }
+
+    pub struct UnstakeTxBuilder<'a: 'b, 'b, A: flatbuffers::Allocator + 'a> {
+        fbb_: &'b mut flatbuffers::FlatBufferBuilder<'a, A>,
+        start_: flatbuffers::WIPOffset<flatbuffers::TableUnfinishedWIPOffset>,
+    }
+    impl<'a: 'b, 'b, A: flatbuffers::Allocator + 'a> UnstakeTxBuilder<'a, 'b, A> {
+        #[inline]
+        pub fn add_delegator(
+            &mut self,
+            delegator: flatbuffers::WIPOffset<flatbuffers::Vector<'b, u8>>,
+        ) {
+            self.fbb_
+                .push_slot_always::<flatbuffers::WIPOffset<_>>(UnstakeTx::VT_DELEGATOR, delegator);
+        }
+        #[inline]
+        pub fn add_witness(
+            &mut self,
+            witness: flatbuffers::WIPOffset<flatbuffers::Vector<'b, u8>>,
+        ) {
+            self.fbb_
+                .push_slot_always::<flatbuffers::WIPOffset<_>>(UnstakeTx::VT_WITNESS, witness);
+        }
+        #[inline]
+        pub fn add_amount(&mut self, amount: u64) {
+            self.fbb_.push_slot::<u64>(UnstakeTx::VT_AMOUNT, amount, 0);
+        }
+        #[inline]
+        pub fn add_nonce(&mut self, nonce: u64) {
+            self.fbb_.push_slot::<u64>(UnstakeTx::VT_NONCE, nonce, 0);
+        }
+        #[inline]
+        pub fn add_signature(
+            &mut self,
+            signature: flatbuffers::WIPOffset<flatbuffers::Vector<'b, u8>>,
+        ) {
+            self.fbb_
+                .push_slot_always::<flatbuffers::WIPOffset<_>>(UnstakeTx::VT_SIGNATURE, signature);
+        }
+        #[inline]
+        pub fn add_gas_sponsorer(
+            &mut self,
+            gas_sponsorer: flatbuffers::WIPOffset<flatbuffers::Vector<'b, u8>>,
+        ) {
+            self.fbb_.push_slot_always::<flatbuffers::WIPOffset<_>>(
+                UnstakeTx::VT_GAS_SPONSORER,
+                gas_sponsorer,
+            );
+        }
+        #[inline]
+        pub fn new(
+            _fbb: &'b mut flatbuffers::FlatBufferBuilder<'a, A>,
+        ) -> UnstakeTxBuilder<'a, 'b, A> {
+            let start = _fbb.start_table();
+            UnstakeTxBuilder {
+                fbb_: _fbb,
+                start_: start,
+            }
+        }
+        #[inline]
+        pub fn finish(self) -> flatbuffers::WIPOffset<UnstakeTx<'a>> {
+            let o = self.fbb_.end_table(self.start_);
+            flatbuffers::WIPOffset::new(o.value())
+        }
+    }
+
+    impl core::fmt::Debug for UnstakeTx<'_> {
+        fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+            let mut ds = f.debug_struct("UnstakeTx");
+            ds.field("delegator", &self.delegator());
+            ds.field("witness", &self.witness());
             ds.field("amount", &self.amount());
             ds.field("nonce", &self.nonce());
             ds.field("signature", &self.signature());
@@ -1773,6 +2290,21 @@ pub mod tx {
 
         #[inline]
         #[allow(non_snake_case)]
+        pub fn body_as_burn_tx(&self) -> Option<BurnTx<'a>> {
+            if self.body_type() == TxBody::BurnTx {
+                self.body().map(|t| {
+                    // Safety:
+                    // Created from a valid Table for this object
+                    // Which contains a valid union in this slot
+                    unsafe { BurnTx::init_from_table(t) }
+                })
+            } else {
+                None
+            }
+        }
+
+        #[inline]
+        #[allow(non_snake_case)]
         pub fn body_as_stake_tx(&self) -> Option<StakeTx<'a>> {
             if self.body_type() == TxBody::StakeTx {
                 self.body().map(|t| {
@@ -1780,6 +2312,21 @@ pub mod tx {
                     // Created from a valid Table for this object
                     // Which contains a valid union in this slot
                     unsafe { StakeTx::init_from_table(t) }
+                })
+            } else {
+                None
+            }
+        }
+
+        #[inline]
+        #[allow(non_snake_case)]
+        pub fn body_as_unstake_tx(&self) -> Option<UnstakeTx<'a>> {
+            if self.body_type() == TxBody::UnstakeTx {
+                self.body().map(|t| {
+                    // Safety:
+                    // Created from a valid Table for this object
+                    // Which contains a valid union in this slot
+                    unsafe { UnstakeTx::init_from_table(t) }
                 })
             } else {
                 None
@@ -1827,9 +2374,19 @@ pub mod tx {
                                 "TxBody::MintTx",
                                 pos,
                             ),
+                        TxBody::BurnTx => v
+                            .verify_union_variant::<flatbuffers::ForwardsUOffset<BurnTx>>(
+                                "TxBody::BurnTx",
+                                pos,
+                            ),
                         TxBody::StakeTx => v
                             .verify_union_variant::<flatbuffers::ForwardsUOffset<StakeTx>>(
                                 "TxBody::StakeTx",
+                                pos,
+                            ),
+                        TxBody::UnstakeTx => v
+                            .verify_union_variant::<flatbuffers::ForwardsUOffset<UnstakeTx>>(
+                                "TxBody::UnstakeTx",
                                 pos,
                             ),
                         TxBody::SolveTx => v
@@ -1915,8 +2472,28 @@ pub mod tx {
                         )
                     }
                 }
+                TxBody::BurnTx => {
+                    if let Some(x) = self.body_as_burn_tx() {
+                        ds.field("body", &x)
+                    } else {
+                        ds.field(
+                            "body",
+                            &"InvalidFlatbuffer: Union discriminant does not match value.",
+                        )
+                    }
+                }
                 TxBody::StakeTx => {
                     if let Some(x) = self.body_as_stake_tx() {
+                        ds.field("body", &x)
+                    } else {
+                        ds.field(
+                            "body",
+                            &"InvalidFlatbuffer: Union discriminant does not match value.",
+                        )
+                    }
+                }
+                TxBody::UnstakeTx => {
+                    if let Some(x) = self.body_as_unstake_tx() {
                         ds.field("body", &x)
                     } else {
                         ds.field(

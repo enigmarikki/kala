@@ -28,9 +28,27 @@ table MintTx {
   gas_sponsorer:[ubyte];
 }
 
-table StakeTx {
+table BurnTx {
   sender:[ubyte];
-  delegation_receiver:[ubyte];
+  amount:ulong;
+  denom:[ubyte];
+  nonce:ulong;
+  signature:[ubyte];
+  gas_sponsorer:[ubyte];
+}
+
+table StakeTx {
+  delegator:[ubyte];
+  witness:[ubyte];
+  amount:ulong;
+  nonce:ulong;
+  signature:[ubyte];
+  gas_sponsorer:[ubyte];
+}
+
+table UnstakeTx{
+  delegator:[ubyte];
+  witness:[ubyte];
   amount:ulong;
   nonce:ulong;
   signature:[ubyte];
@@ -45,7 +63,7 @@ table SolveTx {
   signature:[ubyte];
   gas_sponsorer:[ubyte];
 }
-union TxBody { SendTx, MintTx, StakeTx, SolveTx }
+union TxBody { SendTx, MintTx, BurnTx, StakeTx, UnstakeTx, SolveTx }
 
 // Main transaction table
 table Transaction {

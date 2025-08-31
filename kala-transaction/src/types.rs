@@ -48,9 +48,28 @@ pub struct Mint {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Stake {
+pub struct Burn {
     pub sender: Bytes32Array,
-    pub delegation_receiver: Bytes32Array,
+    pub amount: u64,
+    pub denom: Bytes32Array,
+    pub nonce: u64,
+    pub signature: Bytes64, // As Vec<u8>
+    pub gas_sponsorer: Bytes32Array,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Stake {
+    pub delegator: Bytes32Array,
+    pub witness: Bytes32Array,
+    pub amount: u64,
+    pub nonce: u64,
+    pub signature: Bytes64,
+    pub gas_sponsorer: Bytes32Array,
+}
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Unstake {
+    pub delegator: Bytes32Array,
+    pub witness: Bytes32Array,
     pub amount: u64,
     pub nonce: u64,
     pub signature: Bytes64,
@@ -103,7 +122,9 @@ impl Solve {
 pub enum Transaction {
     Send(Send),
     Mint(Mint),
+    Burn(Burn),
     Stake(Stake),
+    Unstake(Unstake),
     Solve(Solve),
 }
 
@@ -157,7 +178,19 @@ impl KalaSerialize for Mint {
     }
 }
 
+impl KalaSerialize for Burn {
+    fn preferred_encoding() -> EncodingType {
+        EncodingType::FlatBuffers
+    }
+}
+
 impl KalaSerialize for Stake {
+    fn preferred_encoding() -> EncodingType {
+        EncodingType::FlatBuffers
+    }
+}
+
+impl KalaSerialize for Unstake {
     fn preferred_encoding() -> EncodingType {
         EncodingType::FlatBuffers
     }
