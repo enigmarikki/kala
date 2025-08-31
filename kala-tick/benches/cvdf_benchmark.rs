@@ -311,15 +311,15 @@ fn bench_realistic_workflow(c: &mut Criterion) {
 
 criterion_group!(
     benches,
-    //bench_single_step,
-    //bench_k_steps,
-    //bench_single_step_proof_generation,
-    //bench_proof_aggregation,
-    //bench_class_group_operations,
-    //bench_pietrzak_proof,
-    //bench_state_management,
-    //bench_stream_computation,
-    //bench_frontier_operations,
+    bench_single_step,
+    bench_k_steps,
+    bench_single_step_proof_generation,
+    bench_proof_aggregation,
+    bench_class_group_operations,
+    bench_pietrzak_proof,
+    bench_state_management,
+    bench_stream_computation,
+    bench_frontier_operations,
     bench_realistic_workflow
 );
 
