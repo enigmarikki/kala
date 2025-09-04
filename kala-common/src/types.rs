@@ -64,28 +64,11 @@ pub mod network {
 
 /// VDF and consensus constants
 pub mod consensus {
-    /// Default iterations per tick (k = 2^16)
-    pub const DEFAULT_ITERATIONS_PER_TICK: u64 = 65536;
-
-    /// VDF discriminant from the paper
+    pub const K_ITERATIONS: u64 = 163840;
     pub const DEFAULT_DISCRIMINANT: &str = "-141140317794792668862943332656856519378482291428727287413318722089216448567155737094768903643716404517549715385664163360316296284155310058980984373770517398492951860161717960368874227473669336541818575166839209228684755811071416376384551902149780184532086881683576071479646499601330824259260645952517205526679";
-
-    /// Tick phases
-    /// TODO: Profile this properly
-    pub const COLLECTION_PHASE_RATIO: f64 = 1.0 / 3.0; // k/3
-    pub const CONSENSUS_PHASE_RATIO: f64 = 2.0 / 3.0; // 2k/3
-    pub const FINALIZATION_PHASE_RATIO: f64 = 1.0; // k
-}
-
-/// Database constants
-pub mod database {
-    /// Key prefixes for different data types
-    pub const CHAIN_STATE_KEY: &[u8] = b"chain_state";
-    pub const TICK_PREFIX: &str = "tick";
-    pub const VDF_TICK_PREFIX: &str = "vdf_tick";
-    pub const ACCOUNT_PREFIX: &str = "account";
-    pub const TRANSACTION_PREFIX: &str = "tx";
-    pub const BLOCK_INDEX_KEY: &[u8] = b"tick_index";
+    pub const COLLECTION_PHASE_END: u64 = 43690;
+    pub const CONSENSUS_PHASE_END: u64 = 65536;
+    pub const RSW_HARDNESS_CONSTANT: u64 = 65536;
 }
 
 /// Configuration defaults
@@ -95,17 +78,6 @@ pub struct KalaDefaults {
     pub max_peers: usize,
     pub rpc_port: u16,
     pub network_port: u16,
-}
-
-impl Default for KalaDefaults {
-    fn default() -> Self {
-        Self {
-            iterations_per_tick: consensus::DEFAULT_ITERATIONS_PER_TICK,
-            max_peers: 100,
-            rpc_port: 8545,
-            network_port: 8080,
-        }
-    }
 }
 
 /// Version information

@@ -100,6 +100,7 @@ serde_json = "1.0"                                          # JSON serialization
 serde_yaml = "0.9"                                          # YAML configuration files
 toml = "0.9.5"                                              # TOML configuration files
 
+tempfile = {version = "*"}
 # Optimized release profile for production builds
 # These settings maximize performance for VDF computations
 [profile.release]

@@ -57,10 +57,11 @@ blake3 = "1.5"                                             # Blake3 for CVDF has
 
 # RPC and networking
 jsonrpsee = { workspace = true }                           # JSON-RPC implementation
+tempfile = {workspace = true}
 
 # Development node binary - for testing and experimentation
 # Usage: cargo run -p kala-core --bin devnode -- --help
-[[bin]]
-name = "devnode"
-path = "bin/devnode.rs"
+#[[bin]]
+##name = "devnode"
+#path = "bin/devnode.rs"
 

@@ -7,7 +7,7 @@ use kala_common::{
 };
 use kala_tick::{Discriminant, QuadraticForm};
 use kala_transaction::types::{
-    Burn, Bytes32, Mint, RSWPuzzle, SealedTransaction, Send, Solve, Stake, Transaction, Unstake,
+    Burn, Bytes32, Mint, RSWPuzzle, Send, Solve, Stake, TimelockTransaction, Transaction, Unstake,
 };
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
@@ -27,15 +27,6 @@ pub struct Account {
     pub stake: BTreeMap<Bytes32, u64>,
     pub nonce: u64,
     pub puzzles_solved: Vec<Bytes32>,
-}
-/// Encrypted envelope for MEV prevention
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct EncryptedEnvelope {
-    pub hash: Hash,
-    pub ciphertext: SealedTransaction,
-    pub puzzle: RSWPuzzle,
-    pub witnessed_iteration: IterationNumber,
-    pub witness_chain_id: NodeId,
 }
 
 /// Witness observation
@@ -119,7 +110,7 @@ pub struct KalaState {
     pub total_supply: BTreeMap<Bytes32, u64>,
 
     // Transaction processing
-    pub pending_envelopes: Vec<EncryptedEnvelope>,
+    pub pending_envelopes: Vec<TimelockTransaction>,
     pub observations: BTreeMap<Hash, Vec<WitnessObservation>>,
     pub decrypted_transactions: BTreeMap<Hash, Transaction>,
 
@@ -131,7 +122,23 @@ pub struct KalaState {
     pub total_transactions: u64,
     pub total_iterations: IterationNumber,
 }
+// Helper function to create test witness IDs
+pub fn test_witness_ids() -> Vec<NodeId> {
+    vec![[1u8; 32], [2u8; 32], [3u8; 32]]
+}
 
+// Helper function to create a test account
+pub fn create_test_account(address: Bytes32, balance: u64) -> Account {
+    let mut balances = BTreeMap::new();
+    balances.insert([0u8; 32], balance); // Native token
+    Account {
+        address,
+        balances,
+        stake: BTreeMap::new(),
+        nonce: 0,
+        puzzles_solved: Vec::new(),
+    }
+}
 impl KalaState {
     pub fn genesis(chain_id: NodeId, witness_ids: Vec<NodeId>) -> Self {
         let witness_set: BTreeMap<NodeId, bool> =
@@ -451,7 +458,7 @@ impl KalaState {
         self.current_iteration = iteration;
     }
 
-    pub fn add_envelope(&mut self, envelope: EncryptedEnvelope) {
+    pub fn add_envelope(&mut self, envelope: TimelockTransaction) {
         self.pending_envelopes.push(envelope);
     }
 
