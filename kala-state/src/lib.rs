@@ -1,4 +1,5 @@
 // kala-state/src/lib.rs
+use kala_common::types::NetworkParams;
 use kala_common::{
     crypto::CryptoUtils,
     database::{DatabaseOps, KalaDatabase, TypedDatabaseOps},
@@ -12,12 +13,6 @@ use kala_transaction::types::{
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::sync::Arc;
-// Constants from the whitepaper
-const K_ITERATIONS: u64 = 65536;
-const COLLECTION_PHASE_END: u64 = 21845;
-const CONSENSUS_PHASE_END: u64 = 43690;
-const RSW_HARDNESS_CONSTANT: u64 = 32768;
-const BYZANTINE_THRESHOLD_DENOMINATOR: usize = 3;
 
 /// Account state
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -143,7 +138,8 @@ impl KalaState {
     pub fn genesis(chain_id: NodeId, witness_ids: Vec<NodeId>) -> Self {
         let witness_set: BTreeMap<NodeId, bool> =
             witness_ids.into_iter().map(|id| (id, true)).collect();
-        let byzantine_threshold = witness_set.len() / BYZANTINE_THRESHOLD_DENOMINATOR;
+        let byzantine_threshold =
+            witness_set.len() / NetworkParams::BYZANTINE_THRESHOLD_DENOMINATOR;
 
         let vdf_discriminant = Self::default_discriminant();
         let vdf_current_form = QuadraticForm::identity(&vdf_discriminant);
@@ -178,14 +174,14 @@ impl KalaState {
     }
 
     pub fn get_current_phase(&self) -> TickPhase {
-        let iteration_in_tick = self.current_iteration % K_ITERATIONS;
-        if iteration_in_tick < COLLECTION_PHASE_END {
+        let iteration_in_tick = self.current_iteration % NetworkParams::K_ITERATIONS;
+        if iteration_in_tick < NetworkParams::COLLECTION_PHASE_END {
             TickPhase::Collection
-        } else if iteration_in_tick < CONSENSUS_PHASE_END {
+        } else if iteration_in_tick < NetworkParams::CONSENSUS_PHASE_END {
             TickPhase::Consensus
-        } else if iteration_in_tick < RSW_HARDNESS_CONSTANT {
-            TickPhase::Consensus
-        } else if iteration_in_tick < (K_ITERATIONS * 5 / 6) {
+        } else if iteration_in_tick
+            < NetworkParams::CONSENSUS_PHASE_END + NetworkParams::RSW_HARDNESS_CONSTANT
+        {
             TickPhase::Decryption
         } else {
             TickPhase::StateUpdate
@@ -429,7 +425,8 @@ impl KalaState {
 
         // Verify iteration count
         if self.current_iteration
-            != self.current_tick * K_ITERATIONS + (self.current_iteration % K_ITERATIONS)
+            != self.current_tick * NetworkParams::K_ITERATIONS
+                + (self.current_iteration % NetworkParams::K_ITERATIONS)
         {
             return Err(KalaError::validation("Iteration count inconsistent"));
         }
@@ -648,32 +645,32 @@ mod tests {
     fn test_phase_calculation() {
         let mut state = KalaState::genesis([0u8; 32], test_witness_ids());
 
-        // Collection phase (0 - 21844)
         state.current_iteration = 0;
         assert_eq!(state.get_current_phase(), TickPhase::Collection);
 
         state.current_iteration = 10000;
         assert_eq!(state.get_current_phase(), TickPhase::Collection);
 
-        state.current_iteration = COLLECTION_PHASE_END - 1;
+        state.current_iteration = NetworkParams::COLLECTION_PHASE_END - 1;
         assert_eq!(state.get_current_phase(), TickPhase::Collection);
 
         // Consensus phase (21845 - 43689)
-        state.current_iteration = COLLECTION_PHASE_END;
+        state.current_iteration = NetworkParams::COLLECTION_PHASE_END;
         assert_eq!(state.get_current_phase(), TickPhase::Consensus);
 
-        state.current_iteration = 30000;
+        state.current_iteration = 50000;
         assert_eq!(state.get_current_phase(), TickPhase::Consensus);
 
-        state.current_iteration = CONSENSUS_PHASE_END - 1;
+        state.current_iteration = NetworkParams::CONSENSUS_PHASE_END - 1;
         assert_eq!(state.get_current_phase(), TickPhase::Consensus);
 
         // Decryption phase
-        state.current_iteration = CONSENSUS_PHASE_END + 1;
+        state.current_iteration = NetworkParams::CONSENSUS_PHASE_END + 1;
         assert_eq!(state.get_current_phase(), TickPhase::Decryption);
 
         // State update phase (last 1/6 of tick)
-        state.current_iteration = K_ITERATIONS * 5 / 6;
+        state.current_iteration =
+            NetworkParams::CONSENSUS_PHASE_END + NetworkParams::RSW_HARDNESS_CONSTANT + 1;
         assert_eq!(state.get_current_phase(), TickPhase::StateUpdate);
     }
 
@@ -1055,10 +1052,10 @@ mod tests {
         let mut state = KalaState::genesis([0u8; 32], test_witness_ids());
 
         state.current_tick = 5;
-        state.current_iteration = K_ITERATIONS * 5 + 100; // Correct
+        state.current_iteration = NetworkParams::K_ITERATIONS * 5 + 100; // Correct
         assert!(state.verify_state().is_ok());
 
-        state.current_iteration = K_ITERATIONS * 6; // Wrong
+        state.current_iteration = NetworkParams::K_ITERATIONS * 6; // Wrong
         assert!(state.verify_state().is_err());
     }
 
@@ -1094,7 +1091,7 @@ mod tests {
 
             // Modify state
             manager.current_state.current_tick = 10;
-            manager.current_state.current_iteration = K_ITERATIONS * 10;
+            manager.current_state.current_iteration = NetworkParams::K_ITERATIONS * 10;
             manager
                 .current_state
                 .accounts
@@ -1112,7 +1109,10 @@ mod tests {
                 .unwrap();
 
             assert_eq!(manager.current_state.current_tick, 10);
-            assert_eq!(manager.current_state.current_iteration, K_ITERATIONS * 10);
+            assert_eq!(
+                manager.current_state.current_iteration,
+                NetworkParams::K_ITERATIONS * 10
+            );
             assert_eq!(manager.current_state.accounts.len(), 1);
             assert_eq!(
                 *manager.current_state.total_supply.get(&[0u8; 32]).unwrap(),
@@ -1160,7 +1160,7 @@ mod tests {
 
         // Modify state
         state.current_tick = 100;
-        state.current_iteration = K_ITERATIONS * 100;
+        state.current_iteration = NetworkParams::K_ITERATIONS * 100;
         state.current_phase = TickPhase::Consensus;
         state
             .accounts
