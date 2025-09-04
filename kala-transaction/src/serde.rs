@@ -169,20 +169,6 @@ fn vec_to_array<const N: usize>(vec: flatbuffers::Vector<u8>) -> KalaResult<[u8;
     Ok(array)
 }
 
-/// Helper function to convert FlatBuffer vector to Vec<u8> with size validation
-fn vec_to_vec(vec: flatbuffers::Vector<u8>, expected_size: Option<usize>) -> KalaResult<Vec<u8>> {
-    let bytes = vec.bytes().to_vec();
-    if let Some(expected) = expected_size {
-        if bytes.len() != expected {
-            return Err(KalaError::validation(format!(
-                "Invalid size: expected {}, got {}",
-                expected,
-                bytes.len()
-            )));
-        }
-    }
-    Ok(bytes)
-}
 
 /// Convert FlatBuffer to Rust transaction
 pub fn flatbuffer_to_transaction(bytes: &[u8]) -> KalaResult<Transaction> {
@@ -211,11 +197,10 @@ pub fn flatbuffer_to_transaction(bytes: &[u8]) -> KalaResult<Transaction> {
                     )?,
                     amount: st.amount(),
                     nonce: st.nonce(),
-                    signature: vec_to_vec(
-                        st.signature().ok_or_else(|| {
+                    signature: vec_to_array(
+                        st.signature().ok_or_else(|| 
                             KalaError::validation("Missing signature".to_string())
-                        })?,
-                        Some(64),
+                        )?,
                     )?,
                     gas_sponsorer: vec_to_array::<32>(st.gas_sponsorer().ok_or_else(|| {
                         KalaError::validation("Missing gas_sponsorer".to_string())
@@ -238,11 +223,10 @@ pub fn flatbuffer_to_transaction(bytes: &[u8]) -> KalaResult<Transaction> {
                             .ok_or_else(|| KalaError::validation("Missing denom".to_string()))?,
                     )?,
                     nonce: mt.nonce(),
-                    signature: vec_to_vec(
-                        mt.signature().ok_or_else(|| {
+                    signature: vec_to_array::<64>(
+                        mt.signature().ok_or_else(|| 
                             KalaError::validation("Missing signature".to_string())
-                        })?,
-                        Some(64),
+                        )?,
                     )?,
                     gas_sponsorer: vec_to_array::<32>(mt.gas_sponsorer().ok_or_else(|| {
                         KalaError::validation("Missing gas_sponsorer".to_string())
@@ -265,11 +249,10 @@ pub fn flatbuffer_to_transaction(bytes: &[u8]) -> KalaResult<Transaction> {
                             .ok_or_else(|| KalaError::validation("Missing denom".to_string()))?,
                     )?,
                     nonce: mt.nonce(),
-                    signature: vec_to_vec(
-                        mt.signature().ok_or_else(|| {
+                    signature: vec_to_array(
+                        mt.signature().ok_or_else(|| 
                             KalaError::validation("Missing signature".to_string())
-                        })?,
-                        Some(64),
+                        )?
                     )?,
                     gas_sponsorer: vec_to_array::<32>(mt.gas_sponsorer().ok_or_else(|| {
                         KalaError::validation("Missing gas_sponsorer".to_string())
@@ -292,11 +275,10 @@ pub fn flatbuffer_to_transaction(bytes: &[u8]) -> KalaResult<Transaction> {
                     )?,
                     amount: st.amount(),
                     nonce: st.nonce(),
-                    signature: vec_to_vec(
-                        st.signature().ok_or_else(|| {
+                    signature: vec_to_array(
+                        st.signature().ok_or_else(|| 
                             KalaError::validation("Missing signature".to_string())
-                        })?,
-                        Some(64),
+                        )?
                     )?,
                     gas_sponsorer: vec_to_array::<32>(st.gas_sponsorer().ok_or_else(|| {
                         KalaError::validation("Missing gas_sponsorer".to_string())
@@ -319,11 +301,10 @@ pub fn flatbuffer_to_transaction(bytes: &[u8]) -> KalaResult<Transaction> {
                     )?,
                     amount: st.amount(),
                     nonce: st.nonce(),
-                    signature: vec_to_vec(
-                        st.signature().ok_or_else(|| {
+                    signature: vec_to_array(
+                        st.signature().ok_or_else(|| 
                             KalaError::validation("Missing signature".to_string())
-                        })?,
-                        Some(64),
+                        )?
                     )?,
                     gas_sponsorer: vec_to_array::<32>(st.gas_sponsorer().ok_or_else(|| {
                         KalaError::validation("Missing gas_sponsorer".to_string())
@@ -340,22 +321,20 @@ pub fn flatbuffer_to_transaction(bytes: &[u8]) -> KalaResult<Transaction> {
                         sv.sender()
                             .ok_or_else(|| KalaError::validation("Missing sender".to_string()))?,
                     )?,
-                    proof: vec_to_vec(
+                    proof: vec_to_array(
                         sv.proof()
                             .ok_or_else(|| KalaError::validation("Missing proof".to_string()))?,
-                        Some(256),
                     )?,
                     puzzle_id: vec_to_array::<32>(
-                        sv.puzzle_id().ok_or_else(|| {
+                        sv.puzzle_id().ok_or_else(|| 
                             KalaError::validation("Missing puzzle_id".to_string())
-                        })?,
+                        )?,
                     )?,
                     nonce: sv.nonce(),
-                    signature: vec_to_vec(
-                        sv.signature().ok_or_else(|| {
+                    signature: vec_to_array(
+                        sv.signature().ok_or_else(|| 
                             KalaError::validation("Missing signature".to_string())
-                        })?,
-                        Some(64),
+                        )?
                     )?,
                     gas_sponsorer: vec_to_array::<32>(sv.gas_sponsorer().ok_or_else(|| {
                         KalaError::validation("Missing gas_sponsorer".to_string())
@@ -375,7 +354,7 @@ pub fn flatbuffer_to_transaction(bytes: &[u8]) -> KalaResult<Transaction> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::types::{bytes64, EMPTY64BYTES};
+    use crate::types::{Bytes64, EMPTY64BYTES};
 
     fn create_test_send_tx() -> Transaction {
         Transaction::Send(Send {
@@ -384,7 +363,7 @@ mod tests {
             denom: [3u8; 32],
             amount: 1000,
             nonce: 1,
-            signature: bytes64(EMPTY64BYTES),
+            signature: EMPTY64BYTES,
             gas_sponsorer: [5u8; 32],
         })
     }
@@ -395,7 +374,7 @@ mod tests {
             amount: 5000,
             denom: [11u8; 32],
             nonce: 2,
-            signature: vec![12u8; 64],
+            signature: [12u8; 64],
             gas_sponsorer: [13u8; 32],
         })
     }
@@ -406,7 +385,7 @@ mod tests {
             amount: 3000,
             denom: [21u8; 32],
             nonce: 3,
-            signature: vec![22u8; 64],
+            signature: [22u8; 64],
             gas_sponsorer: [23u8; 32],
         })
     }
@@ -417,7 +396,7 @@ mod tests {
             witness: [31u8; 32],
             amount: 10000,
             nonce: 4,
-            signature: vec![32u8; 64],
+            signature: [32u8; 64],
             gas_sponsorer: [33u8; 32],
         })
     }
@@ -428,7 +407,7 @@ mod tests {
             witness: [41u8; 32],
             amount: 7500,
             nonce: 5,
-            signature: vec![42u8; 64],
+            signature: [42u8; 64],
             gas_sponsorer: [43u8; 32],
         })
     }
@@ -436,10 +415,10 @@ mod tests {
     fn create_test_solve_tx() -> Transaction {
         Transaction::Solve(Solve {
             sender: [50u8; 32],
-            proof: vec![51u8; 256],
+            proof: [51u8; 256],
             puzzle_id: [52u8; 32],
             nonce: 6,
-            signature: vec![53u8; 64],
+            signature: [53u8; 64],
             gas_sponsorer: [54u8; 32],
         })
     }
@@ -618,7 +597,7 @@ mod tests {
             denom: [255u8; 32],
             amount: u64::MAX,
             nonce: u64::MAX,
-            signature: vec![255u8; 64],
+            signature: [255u8; 64],
             gas_sponsorer: [255u8; 32],
         });
 
@@ -643,7 +622,7 @@ mod tests {
             denom: [0u8; 32],
             amount: 0,
             nonce: 0,
-            signature: vec![0u8; 64],
+            signature: [0u8; 64],
             gas_sponsorer: [0u8; 32],
         });
 
@@ -706,7 +685,7 @@ mod tests {
     }
 
     #[test]
-    fn test_vec_to_vec_with_expected_size() {
+    fn test_vec_to_array_with_expected_size() {
         // We need to test this through the full serialization path
         let tx = Transaction::Send(Send {
             sender: [1u8; 32],
@@ -714,7 +693,7 @@ mod tests {
             denom: [3u8; 32],
             amount: 1000,
             nonce: 1,
-            signature: vec![4u8; 64], // Correct size
+            signature: [4u8; 64], // Correct size
             gas_sponsorer: [5u8; 32],
         });
 
@@ -733,10 +712,10 @@ mod tests {
     fn test_solve_proof_size_validation() {
         let tx = Transaction::Solve(Solve {
             sender: [50u8; 32],
-            proof: vec![51u8; 256], // Correct size
+            proof: [51u8; 256], // Correct size
             puzzle_id: [52u8; 32],
             nonce: 6,
-            signature: vec![53u8; 64],
+            signature: [53u8; 64],
             gas_sponsorer: [54u8; 32],
         });
 
@@ -861,7 +840,7 @@ mod tests {
                 denom: pattern,
                 amount: 1000,
                 nonce: 1,
-                signature: vec![pattern[0]; 64],
+                signature: [pattern[0]; 64],
                 gas_sponsorer: pattern,
             });
 
@@ -940,14 +919,14 @@ mod tests {
     #[test]
     fn test_large_proof_handling() {
         // Test with maximum expected proof size
-        let large_proof = vec![42u8; 256];
+        let large_proof = [42u8; 256];
 
         let tx = Transaction::Solve(Solve {
             sender: [50u8; 32],
             proof: large_proof.clone(),
             puzzle_id: [52u8; 32],
             nonce: 6,
-            signature: vec![53u8; 64],
+            signature: [53u8; 64],
             gas_sponsorer: [54u8; 32],
         });
 
@@ -985,7 +964,7 @@ mod tests {
             denom: [3u8; 32],
             amount: 1000,
             nonce: 1,
-            signature: vec![4u8; 64],
+            signature: [4u8; 64],
             gas_sponsorer: [5u8; 32],
         });
 

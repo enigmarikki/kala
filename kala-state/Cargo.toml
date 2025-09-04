@@ -25,7 +25,7 @@ repository.workspace = true
 # Internal Kala crates
 kala-common = { workspace = true }                         # Shared types and database utilities
 kala-tick = { workspace = true }                           # CVDF streaming implementation
-
+kala-transaction = {workspace = true}
 # Database and persistence
 rocksdb = { workspace = true }                             # High-performance key-value store
 

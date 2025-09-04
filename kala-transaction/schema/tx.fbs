@@ -1,13 +1,5 @@
 namespace tx;
 
-// Byte array types
-struct Bytes32  { data:[ubyte:32]; }
-struct Bytes64  { data:[ubyte:64]; }
-struct Bytes128 { data:[ubyte:128]; }
-struct Bytes256 { data:[ubyte:256]; }
-struct Nonce96 { data:[ubyte:12]; }   
-struct Tag128  { mac:[ubyte:16]; }
-
 // Transaction types
 table SendTx {
   sender:[ubyte];

@@ -43,7 +43,6 @@ pub mod crypto;
 pub mod database;
 pub mod error;
 pub mod network;
-pub mod serialization;
 pub mod types;
 pub mod validation;
 
@@ -52,16 +51,13 @@ pub mod prelude {
     pub use crate::crypto::{CryptoUtils, HASH_SIZE, PUBKEY_SIZE, SIGNATURE_SIZE};
     pub use crate::database::{DatabaseOps, KalaDatabase};
     pub use crate::error::{KalaError, KalaResult};
-    pub use crate::network::{MessageHandler, MessageType, NetworkConfig, NetworkLayer};
-    pub use crate::serialization::{EncodingType, HashCompute, KalaSerialize, NetworkMessage};
     pub use crate::types::{
-        BlockHeight, HashExt, IterationNumber, NodeId, PublicKeyExt, SignatureExt, Timestamp,
+        HashExt, IterationNumber, NodeId, PublicKeyExt, SignatureExt, TickNumber, Timestamp,
     };
     pub use crate::validation::ValidationUtils;
 
     // Re-export essential external crates
     pub use anyhow::Result;
-    pub use serde::{Deserialize, Serialize};
 }
 
 // Version and constants

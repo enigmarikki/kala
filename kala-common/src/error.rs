@@ -1,3 +1,4 @@
+//kala-common/src/error.rs
 //! Standardized error types for all Kala components
 
 use thiserror::Error;
@@ -10,7 +11,7 @@ pub type KalaResult<T> = std::result::Result<T, KalaError>;
 pub enum KalaError {
     // Serialization errors
     #[error("Serialization error: {0}")]
-    Serialization(#[from] crate::serialization::SerializationError),
+    Serialization(String),
 
     // Network errors
     #[error("Network error: {0}")]

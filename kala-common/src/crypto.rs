@@ -44,6 +44,32 @@ impl CryptoUtils {
         computed_hash == *expected_hash
     }
 
+    /// Compute merkle root from pre-computed hashes
+    pub fn merkle_root_from_hashes(hashes: &[Hash]) -> Hash {
+        if hashes.is_empty() {
+            return HashExt::zero();
+        }
+
+        let mut current = hashes.to_vec();
+
+        while current.len() > 1 {
+            let mut next_level = Vec::new();
+
+            for chunk in current.chunks(2) {
+                if chunk.len() == 2 {
+                    let combined = [chunk[0], chunk[1]].concat();
+                    next_level.push(Self::hash(&combined));
+                } else {
+                    next_level.push(chunk[0]);
+                }
+            }
+
+            current = next_level;
+        }
+
+        current[0]
+    }
+
     /// Generate random bytes (for testing/dev purposes)
     #[cfg(feature = "dev")]
     pub fn random_bytes<const N: usize>() -> [u8; N] {
@@ -205,6 +231,29 @@ mod tests {
 
         let expected = CryptoUtils::hash_multiple(&[&hash1, data2]);
         assert_eq!(chain_hash, expected);
+    }
+
+    #[test]
+    fn test_merkle_root_from_hashes() {
+        let hashes = vec![
+            CryptoUtils::hash(b"test1"),
+            CryptoUtils::hash(b"test2"),
+            CryptoUtils::hash(b"test3"),
+        ];
+
+        let root = CryptoUtils::merkle_root_from_hashes(&hashes);
+        assert_ne!(root, [0u8; 32]);
+
+        // Test empty case
+        let empty: Vec<Hash> = vec![];
+        let empty_root = CryptoUtils::merkle_root_from_hashes(&empty);
+        assert_eq!(empty_root, [0u8; 32]);
+
+        // Test single hash
+        let single_hash = CryptoUtils::hash(b"single");
+        let single = vec![single_hash];
+        let single_root = CryptoUtils::merkle_root_from_hashes(&single);
+        assert_eq!(single_root, single_hash);
     }
 
     #[test]

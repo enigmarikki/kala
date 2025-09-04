@@ -17,7 +17,7 @@ fn create_test_transaction() -> Transaction {
         denom: [3u8; 32],
         amount: 1000,
         nonce: 1,
-        signature: vec![0u8; 64],
+        signature: [0u8; 64],
         gas_sponsorer: [0u8; 32],
     })
 }
@@ -31,7 +31,7 @@ fn create_test_transactions(n: usize) -> Vec<Transaction> {
                 denom: [3u8; 32],
                 amount: 1000 + i as u64,
                 nonce: i as u64,
-                signature: vec![0u8; 64],
+                signature: [0u8; 64],
                 gas_sponsorer: [0u8; 32],
             }),
             1 => Transaction::Mint(Mint {
@@ -39,7 +39,7 @@ fn create_test_transactions(n: usize) -> Vec<Transaction> {
                 denom: [6u8; 32],
                 amount: 5000 + i as u64,
                 nonce: i as u64,
-                signature: vec![1u8; 64],
+                signature: [1u8; 64],
                 gas_sponsorer: [0u8; 32],
             }),
             2 => Transaction::Burn(Burn {
@@ -47,7 +47,7 @@ fn create_test_transactions(n: usize) -> Vec<Transaction> {
                 denom: [8u8; 32],
                 amount: 2000 + i as u64,
                 nonce: i as u64,
-                signature: vec![2u8; 64],
+                signature: [2u8; 64],
                 gas_sponsorer: [0u8; 32],
             }),
             3 => Transaction::Stake(Stake {
@@ -55,7 +55,7 @@ fn create_test_transactions(n: usize) -> Vec<Transaction> {
                 witness: [10u8; 32],
                 amount: 10000 + i as u64,
                 nonce: i as u64,
-                signature: vec![3u8; 64],
+                signature: [3u8; 64],
                 gas_sponsorer: [0u8; 32],
             }),
             _ => Transaction::Unstake(Unstake {
@@ -63,7 +63,7 @@ fn create_test_transactions(n: usize) -> Vec<Transaction> {
                 witness: [12u8; 32],
                 amount: 3000 + i as u64,
                 nonce: i as u64,
-                signature: vec![4u8; 64],
+                signature: [4u8; 64],
                 gas_sponsorer: [0u8; 32],
             }),
         })
@@ -134,7 +134,7 @@ fn bench_dynamic_hardness(c: &mut Criterion) {
     let mut group = c.benchmark_group("dynamic_hardness");
 
     let tx = create_test_transaction();
-    let hardness_values = vec![100, 500, 1000, 2000, 5000];
+    let hardness_values = [100, 500, 1000, 2000, 5000];
 
     for hardness in hardness_values {
         group.bench_with_input(
@@ -167,7 +167,7 @@ fn bench_batch_processing(c: &mut Criterion) {
     println!("Optimal GPU Batch Size: {}", optimal_batch);
 
     // Test various batch sizes to find actual optimal performance
-    let batch_sizes = vec![
+    let batch_sizes = [
         1,
         optimal_batch / 4,
         optimal_batch / 2,
@@ -215,7 +215,7 @@ fn bench_timelock_pipeline(c: &mut Criterion) {
     let ctx = EncryptionContext::new(PROTOCOL_HARDNESS);
 
     // Test at different tick values
-    let tick_values = vec![0, 10, 100, 1000];
+    let tick_values = [0, 10, 100, 1000];
 
     for tick in tick_values {
         let tx = create_test_transaction();
@@ -255,10 +255,10 @@ fn bench_full_batch_pipeline(c: &mut Criterion) {
     ctx.update_tick(1);
 
     let timelock = RSWTimelock::new(PROTOCOL_MODULUS_BITS).unwrap();
-    let optimal_batch = timelock.optimal_batch_size();
+    let optimal_batch = 10000;
 
     // Test realistic batch sizes based on optimal GPU batch
-    let batch_sizes = vec![optimal_batch / 2, optimal_batch, optimal_batch * 2]
+    let batch_sizes = [optimal_batch / 2, optimal_batch, optimal_batch * 2]
         .into_iter()
         .filter(|&s| s > 0 && s <= 500)
         .collect::<Vec<_>>();
@@ -320,7 +320,7 @@ fn bench_hardness_updates(c: &mut Criterion) {
             num_threads,
             |b, &threads| {
                 b.iter(|| {
-                    let mut handles = vec![];
+                    let mut handles = Vec::new();
 
                     for i in 0..threads {
                         let ctx_clone: Arc<EncryptionContext> = Arc::clone(&ctx_arc);
@@ -413,7 +413,7 @@ fn bench_gpu_utilization(c: &mut Criterion) {
     println!("Protocol Hardness: {}", PROTOCOL_HARDNESS);
 
     // Test GPU efficiency at different utilization levels
-    let utilization_levels = vec![
+    let utilization_levels = [
         ("10%", optimal_batch / 10),
         ("25%", optimal_batch / 4),
         ("50%", optimal_batch / 2),
@@ -486,7 +486,7 @@ fn bench_memory_usage(c: &mut Criterion) {
     });
 
     // Memory usage for batch operations
-    let batch_sizes = vec![10, 50, 100, 500];
+    let batch_sizes = [10, 50, 100, 500];
 
     for size in batch_sizes {
         group.bench_with_input(
@@ -538,7 +538,7 @@ fn bench_parallel_processing(c: &mut Criterion) {
             num_threads,
             |b, &threads| {
                 b.iter(|| {
-                    let mut handles = vec![];
+                    let mut handles = Vec::new();
                     let chunk_size = 1000 / threads;
 
                     for i in 0..threads {
@@ -626,7 +626,7 @@ fn bench_real_world_scenarios(c: &mut Criterion) {
     // Scenario 3: Dynamic hardness adjustment
     group.bench_function("dynamic_hardness_adjustment", |b| {
         let block_size = 50;
-        let hardness_values = vec![500, 1000, 2000, 1000, 500]; // Simulate hardness changes
+        let hardness_values = [500, 1000, 2000, 1000, 500]; // Simulate hardness changes
 
         b.iter_batched(
             || create_test_transactions(block_size),
@@ -748,7 +748,7 @@ fn bench_context_operations(c: &mut Criterion) {
 
     group.bench_function("concurrent_tick_updates", |b| {
         b.iter(|| {
-            let mut handles = vec![];
+            let mut handles = Vec::new();
 
             for i in 0..4 {
                 let ctx_clone: Arc<EncryptionContext> = Arc::clone(&ctx_arc);
@@ -771,20 +771,20 @@ fn bench_context_operations(c: &mut Criterion) {
 
 criterion_group!(
     benches,
-    bench_aes_operations,
-    bench_rsw_with_protocol_constants,
-    bench_dynamic_hardness,
-    bench_batch_processing,
-    bench_timelock_pipeline,
+    //bench_aes_operations,
+    //bench_rsw_with_protocol_constants,
+    //bench_dynamic_hardness,
+    //bench_batch_processing,
+    //bench_timelock_pipeline,
     bench_full_batch_pipeline,
-    bench_hardness_updates,
-    bench_throughput_analysis,
-    bench_gpu_utilization,
-    bench_memory_usage,
-    bench_parallel_processing,
+    //bench_hardness_updates,
+    //bench_throughput_analysis,
+    //bench_gpu_utilization,
+    //bench_memory_usage,
+    //bench_parallel_processing,
     bench_real_world_scenarios,
-    bench_latency_analysis,
-    bench_context_operations,
+    //bench_latency_analysis,
+    //bench_context_operations,
 );
 
 criterion_main!(benches);

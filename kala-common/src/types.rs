@@ -1,3 +1,4 @@
+//kala-common/src/types.rs
 //! Common type definitions and constants used throughout Kala
 
 use serde::{Deserialize, Serialize};
@@ -8,8 +9,8 @@ pub type NodeId = [u8; 32];
 /// Timestamp in seconds since Unix epoch
 pub type Timestamp = u64;
 
-/// Block height/tick number
-pub type BlockHeight = u64;
+/// Tick number
+pub type TickNumber = u64;
 
 /// VDF iteration number
 pub type IterationNumber = u64;
@@ -68,12 +69,6 @@ pub mod consensus {
 
     /// VDF discriminant from the paper
     pub const DEFAULT_DISCRIMINANT: &str = "-141140317794792668862943332656856519378482291428727287413318722089216448567155737094768903643716404517549715385664163360316296284155310058980984373770517398492951860161717960368874227473669336541818575166839209228684755811071416376384551902149780184532086881683576071479646499601330824259260645952517205526679";
-
-    /// Tick phases
-    /// TODO: Profile this properly
-    pub const COLLECTION_PHASE_RATIO: f64 = 1.0 / 3.0; // k/3
-    pub const CONSENSUS_PHASE_RATIO: f64 = 2.0 / 3.0; // 2k/3
-    pub const FINALIZATION_PHASE_RATIO: f64 = 1.0; // k
 }
 
 /// Database constants

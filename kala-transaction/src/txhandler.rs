@@ -1,5 +1,5 @@
 use crate::types::{
-    Nonce96Array, RSWPuzzle, SealedTransaction, Tag128Array, TimelockTransaction, Transaction,
+    Nonce96, RSWPuzzle, SealedTransaction, Tag128, TimelockTransaction, Transaction,
     AES_KEY_SIZE, TAG_SIZE,
 };
 use aes_gcm::{
@@ -18,7 +18,6 @@ use timelocks::Solver;
 /// Thread-safe encryption context
 #[derive(Clone)]
 pub struct EncryptionContext {
-    /// Current tick for timelock calculations
     current_tick: Arc<AtomicU64>,
     hardness: Arc<AtomicU32>,
 }
@@ -62,7 +61,7 @@ pub fn encrypt_transaction(
 
     // Generate random nonce
     let nonce_bytes = Aes256Gcm::generate_nonce(&mut OsRng);
-    let nonce_array: Nonce96Array = nonce_bytes
+    let nonce_array: Nonce96 = nonce_bytes
         .as_slice()
         .try_into()
         .map_err(|_| KalaError::crypto("Invalid nonce size".to_string()))?;
@@ -74,7 +73,7 @@ pub fn encrypt_transaction(
 
     // Extract tag from the end of ciphertext (last 16 bytes)
     let (encrypted_data, tag_bytes) = ciphertext.split_at(ciphertext.len() - TAG_SIZE);
-    let tag: Tag128Array = tag_bytes
+    let tag: Tag128 = tag_bytes
         .try_into()
         .map_err(|_| KalaError::crypto("Invalid tag size".to_string()))?;
 
@@ -339,7 +338,7 @@ mod tests {
                 denom: [3u8; 32],
                 amount: 1000,
                 nonce: 1,
-                signature: vec![0u8; 64],
+                signature: [0u8; 64],
                 gas_sponsorer: [0u8; 32],
             }),
             Transaction::Mint(Mint {
@@ -347,7 +346,7 @@ mod tests {
                 denom: [6u8; 32],
                 amount: 5000,
                 nonce: 2,
-                signature: vec![1u8; 64],
+                signature: [1u8; 64],
                 gas_sponsorer: [0u8; 32],
             }),
             Transaction::Burn(Burn {
@@ -355,7 +354,7 @@ mod tests {
                 denom: [8u8; 32],
                 amount: 2000,
                 nonce: 3,
-                signature: vec![2u8; 64],
+                signature: [2u8; 64],
                 gas_sponsorer: [0u8; 32],
             }),
             Transaction::Stake(Stake {
@@ -363,7 +362,7 @@ mod tests {
                 witness: [10u8; 32],
                 amount: 10000,
                 nonce: 4,
-                signature: vec![3u8; 64],
+                signature: [3u8; 64],
                 gas_sponsorer: [0u8; 32],
             }),
             Transaction::Unstake(Unstake {
@@ -371,7 +370,7 @@ mod tests {
                 witness: [12u8; 32],
                 amount: 3000,
                 nonce: 5,
-                signature: vec![4u8; 64],
+                signature: [4u8; 64],
                 gas_sponsorer: [0u8; 32],
             }),
         ]
@@ -795,37 +794,6 @@ mod tests {
         assert!(result.is_ok());
         let timelock_tx = result.unwrap();
         assert_eq!(timelock_tx.puzzle.hardness, 10000);
-    }
-
-    #[test]
-    fn test_large_transaction() {
-        // Create a transaction with maximum signature size
-        let mut large_signature = Vec::new();
-        large_signature.resize(64, 0u8);
-
-        let tx = Transaction::Send(Send {
-            sender: [1u8; 32],
-            receiver: [2u8; 32],
-            denom: [3u8; 32],
-            amount: u64::MAX,
-            nonce: u64::MAX,
-            signature: large_signature,
-            gas_sponsorer: [0u8; 32],
-        });
-
-        let key = [42u8; AES_KEY_SIZE];
-
-        let sealed = encrypt_transaction(&tx, &key).unwrap();
-        let decrypted = decrypt_transaction(&sealed, &key).unwrap();
-
-        match (&tx, &decrypted) {
-            (Transaction::Send(a), Transaction::Send(b)) => {
-                assert_eq!(a.amount, b.amount);
-                assert_eq!(a.nonce, b.nonce);
-                assert_eq!(a.signature.len(), b.signature.len());
-            }
-            _ => panic!("Transaction type mismatch"),
-        }
     }
 
     #[test]

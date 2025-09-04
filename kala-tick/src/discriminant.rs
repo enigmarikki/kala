@@ -1,3 +1,4 @@
+//kala-tick/src/discriminant.rs
 use crate::types::CVDFError;
 use rug::rand::RandState;
 use rug::Integer;

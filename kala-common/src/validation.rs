@@ -3,7 +3,7 @@
 use crate::{
     crypto::CryptoUtils,
     error::{KalaError, KalaResult},
-    types::{BlockHeight, Hash, IterationNumber, NodeId, PublicKey, Signature, Timestamp},
+    types::{Hash, IterationNumber, NodeId, PublicKey, Signature, TickNumber, Timestamp},
 };
 
 /// Validation utilities for common data types
@@ -98,7 +98,7 @@ impl ValidationUtils {
     }
 
     /// Validate block height
-    pub fn validate_block_height(height: BlockHeight) -> KalaResult<()> {
+    pub fn validate_block_height(height: TickNumber) -> KalaResult<()> {
         const MAX_BLOCK_HEIGHT: u64 = u64::MAX / 2; // Reasonable upper bound
 
         if height > MAX_BLOCK_HEIGHT {
@@ -209,42 +209,6 @@ impl ValidationUtils {
 
         Ok(())
     }
-
-    /// Validate VDF parameters
-    pub fn validate_vdf_params(
-        discriminant: &str,
-        iterations: IterationNumber,
-        input: &[u8],
-    ) -> KalaResult<()> {
-        // Validate discriminant format (should be a large negative integer)
-        if !discriminant.starts_with('-') {
-            return Err(KalaError::validation("VDF discriminant must be negative"));
-        }
-
-        let number_part = &discriminant[1..];
-        if !number_part.chars().all(|c| c.is_ascii_digit()) {
-            return Err(KalaError::validation(
-                "VDF discriminant contains invalid characters",
-            ));
-        }
-
-        if discriminant.len() < 100 {
-            return Err(KalaError::validation("VDF discriminant too short"));
-        }
-
-        Self::validate_iteration_number(iterations)?;
-
-        if input.is_empty() {
-            return Err(KalaError::validation("VDF input cannot be empty"));
-        }
-
-        if input.len() > 1024 {
-            return Err(KalaError::validation("VDF input too large"));
-        }
-
-        Ok(())
-    }
-
     /// Validate range for numeric values
     pub fn validate_range<T: PartialOrd + Copy + std::fmt::Debug>(
         value: T,
@@ -294,7 +258,7 @@ pub mod patterns {
 
     /// Block validation pattern
     pub fn validate_block_data(
-        height: BlockHeight,
+        height: TickNumber,
         timestamp: Timestamp,
         previous_hash_hex: &str,
         merkle_root_hex: &str,
@@ -317,30 +281,6 @@ pub mod patterns {
         ValidationUtils::validate_pubkey_hex(sender_id_hex)?;
         ValidationUtils::validate_message_size(payload)?;
         ValidationUtils::validate_signature_hex(signature_hex)?;
-        Ok(())
-    }
-
-    /// VDF tick validation pattern
-    pub fn validate_vdf_tick(
-        tick_number: BlockHeight,
-        input_hex: &str,
-        output_hex: &str,
-        proof_hex: &str,
-        iterations: IterationNumber,
-    ) -> KalaResult<()> {
-        ValidationUtils::validate_block_height(tick_number)?;
-        ValidationUtils::validate_hash_hex(input_hex)?;
-        ValidationUtils::validate_hash_hex(output_hex)?;
-        ValidationUtils::validate_iteration_number(iterations)?;
-
-        // Validate proof (variable length, but should be reasonable)
-        let proof_bytes = hex::decode(proof_hex)
-            .map_err(|e| KalaError::validation(format!("Invalid proof hex: {}", e)))?;
-
-        if proof_bytes.is_empty() || proof_bytes.len() > 10240 {
-            return Err(KalaError::validation("Invalid proof length"));
-        }
-
         Ok(())
     }
 }
@@ -411,23 +351,5 @@ mod tests {
         // Too long
         let long_address = "x".repeat(200);
         assert!(ValidationUtils::validate_address(&long_address).is_err());
-    }
-
-    #[test]
-    fn test_vdf_params_validation() {
-        let discriminant = "-141140317794792668862943332656856519378482291428727287413318722089216448567155737094768903643716404517549715385664163360316296284155310058980984373770517398492951860161717960368874227473669336541818575166839209228684755811071416376384551902149780184532086881683576071479646499601330824259260645952517205526679";
-        let iterations = 65536;
-        let input = b"test_input";
-
-        assert!(ValidationUtils::validate_vdf_params(discriminant, iterations, input).is_ok());
-
-        // Invalid discriminant (positive)
-        assert!(ValidationUtils::validate_vdf_params("12345", iterations, input).is_err());
-
-        // Zero iterations
-        assert!(ValidationUtils::validate_vdf_params(discriminant, 0, input).is_err());
-
-        // Empty input
-        assert!(ValidationUtils::validate_vdf_params(discriminant, iterations, &[]).is_err());
     }
 }
