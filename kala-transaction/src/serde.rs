@@ -169,7 +169,6 @@ fn vec_to_array<const N: usize>(vec: flatbuffers::Vector<u8>) -> KalaResult<[u8;
     Ok(array)
 }
 
-
 /// Convert FlatBuffer to Rust transaction
 pub fn flatbuffer_to_transaction(bytes: &[u8]) -> KalaResult<Transaction> {
     let tx = tx::root_as_transaction(bytes)
@@ -198,9 +197,9 @@ pub fn flatbuffer_to_transaction(bytes: &[u8]) -> KalaResult<Transaction> {
                     amount: st.amount(),
                     nonce: st.nonce(),
                     signature: vec_to_array(
-                        st.signature().ok_or_else(|| 
+                        st.signature().ok_or_else(|| {
                             KalaError::validation("Missing signature".to_string())
-                        )?,
+                        })?,
                     )?,
                     gas_sponsorer: vec_to_array::<32>(st.gas_sponsorer().ok_or_else(|| {
                         KalaError::validation("Missing gas_sponsorer".to_string())
@@ -224,9 +223,9 @@ pub fn flatbuffer_to_transaction(bytes: &[u8]) -> KalaResult<Transaction> {
                     )?,
                     nonce: mt.nonce(),
                     signature: vec_to_array::<64>(
-                        mt.signature().ok_or_else(|| 
+                        mt.signature().ok_or_else(|| {
                             KalaError::validation("Missing signature".to_string())
-                        )?,
+                        })?,
                     )?,
                     gas_sponsorer: vec_to_array::<32>(mt.gas_sponsorer().ok_or_else(|| {
                         KalaError::validation("Missing gas_sponsorer".to_string())
@@ -250,9 +249,9 @@ pub fn flatbuffer_to_transaction(bytes: &[u8]) -> KalaResult<Transaction> {
                     )?,
                     nonce: mt.nonce(),
                     signature: vec_to_array(
-                        mt.signature().ok_or_else(|| 
+                        mt.signature().ok_or_else(|| {
                             KalaError::validation("Missing signature".to_string())
-                        )?
+                        })?,
                     )?,
                     gas_sponsorer: vec_to_array::<32>(mt.gas_sponsorer().ok_or_else(|| {
                         KalaError::validation("Missing gas_sponsorer".to_string())
@@ -276,9 +275,9 @@ pub fn flatbuffer_to_transaction(bytes: &[u8]) -> KalaResult<Transaction> {
                     amount: st.amount(),
                     nonce: st.nonce(),
                     signature: vec_to_array(
-                        st.signature().ok_or_else(|| 
+                        st.signature().ok_or_else(|| {
                             KalaError::validation("Missing signature".to_string())
-                        )?
+                        })?,
                     )?,
                     gas_sponsorer: vec_to_array::<32>(st.gas_sponsorer().ok_or_else(|| {
                         KalaError::validation("Missing gas_sponsorer".to_string())
@@ -302,9 +301,9 @@ pub fn flatbuffer_to_transaction(bytes: &[u8]) -> KalaResult<Transaction> {
                     amount: st.amount(),
                     nonce: st.nonce(),
                     signature: vec_to_array(
-                        st.signature().ok_or_else(|| 
+                        st.signature().ok_or_else(|| {
                             KalaError::validation("Missing signature".to_string())
-                        )?
+                        })?,
                     )?,
                     gas_sponsorer: vec_to_array::<32>(st.gas_sponsorer().ok_or_else(|| {
                         KalaError::validation("Missing gas_sponsorer".to_string())
@@ -326,15 +325,15 @@ pub fn flatbuffer_to_transaction(bytes: &[u8]) -> KalaResult<Transaction> {
                             .ok_or_else(|| KalaError::validation("Missing proof".to_string()))?,
                     )?,
                     puzzle_id: vec_to_array::<32>(
-                        sv.puzzle_id().ok_or_else(|| 
+                        sv.puzzle_id().ok_or_else(|| {
                             KalaError::validation("Missing puzzle_id".to_string())
-                        )?,
+                        })?,
                     )?,
                     nonce: sv.nonce(),
                     signature: vec_to_array(
-                        sv.signature().ok_or_else(|| 
+                        sv.signature().ok_or_else(|| {
                             KalaError::validation("Missing signature".to_string())
-                        )?
+                        })?,
                     )?,
                     gas_sponsorer: vec_to_array::<32>(sv.gas_sponsorer().ok_or_else(|| {
                         KalaError::validation("Missing gas_sponsorer".to_string())

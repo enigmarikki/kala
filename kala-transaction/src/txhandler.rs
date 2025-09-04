@@ -1,6 +1,6 @@
 use crate::types::{
-    Nonce96, RSWPuzzle, SealedTransaction, Tag128, TimelockTransaction, Transaction,
-    AES_KEY_SIZE, TAG_SIZE,
+    Nonce96, RSWPuzzle, SealedTransaction, Tag128, TimelockTransaction, Transaction, AES_KEY_SIZE,
+    TAG_SIZE,
 };
 use aes_gcm::{
     aead::{Aead, AeadCore, KeyInit, OsRng},

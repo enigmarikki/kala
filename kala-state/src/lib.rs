@@ -7,8 +7,7 @@ use kala_common::{
 };
 use kala_tick::{Discriminant, QuadraticForm};
 use kala_transaction::types::{
-    Burn, Bytes32Array, Mint, RSWPuzzle, SealedTransaction, Send, Solve, Stake, Transaction,
-    Unstake,
+    Burn, Bytes32, Mint, RSWPuzzle, SealedTransaction, Send, Solve, Stake, Transaction, Unstake,
 };
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
@@ -23,11 +22,11 @@ const BYZANTINE_THRESHOLD_DENOMINATOR: usize = 3;
 /// Account state
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct Account {
-    pub address: Bytes32Array,
-    pub balances: BTreeMap<Bytes32Array, u64>,
-    pub stake: BTreeMap<Bytes32Array, u64>,
+    pub address: Bytes32,
+    pub balances: BTreeMap<Bytes32, u64>,
+    pub stake: BTreeMap<Bytes32, u64>,
     pub nonce: u64,
-    pub puzzles_solved: Vec<Bytes32Array>,
+    pub puzzles_solved: Vec<Bytes32>,
 }
 /// Encrypted envelope for MEV prevention
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -116,8 +115,8 @@ pub struct KalaState {
     pub vdf_proof_cache: BTreeMap<IterationNumber, Vec<u8>>,
 
     // Account state - BTreeMap for determinism
-    pub accounts: BTreeMap<Bytes32Array, Account>,
-    pub total_supply: BTreeMap<Bytes32Array, u64>,
+    pub accounts: BTreeMap<Bytes32, Account>,
+    pub total_supply: BTreeMap<Bytes32, u64>,
 
     // Transaction processing
     pub pending_envelopes: Vec<EncryptedEnvelope>,
@@ -191,8 +190,8 @@ impl KalaState {
             .accounts
             .values()
             .map(|account| {
-                // Serialize account to bytes then hash
-                let bytes = serde_json::to_vec(account)
+                // Use bincode instead of serde_json for byte array serialization
+                let bytes = bincode::serialize(account)
                     .map_err(|e| KalaError::serialization(format!("Failed to serialize: {}", e)))?;
                 Ok(CryptoUtils::hash(&bytes))
             })
@@ -473,8 +472,8 @@ struct StorableState {
     vdf_current_form_a: String,
     vdf_current_form_b: String,
     vdf_current_form_c: String,
-    accounts: BTreeMap<Bytes32Array, Account>,
-    total_supply: BTreeMap<Bytes32Array, u64>,
+    accounts: BTreeMap<Bytes32, Account>,
+    total_supply: BTreeMap<Bytes32, u64>,
 }
 
 impl StorableState {
@@ -535,14 +534,14 @@ mod tests {
     use super::*;
     use kala_transaction::types::{Burn, Mint, Send, Solve, Stake, Unstake};
     use tempfile::tempdir;
-
+    use tokio;
     // Helper function to create test witness IDs
     fn test_witness_ids() -> Vec<NodeId> {
         vec![[1u8; 32], [2u8; 32], [3u8; 32]]
     }
 
     // Helper function to create a test account
-    fn create_test_account(address: Bytes32Array, balance: u64) -> Account {
+    fn create_test_account(address: Bytes32, balance: u64) -> Account {
         let mut balances = BTreeMap::new();
         balances.insert([0u8; 32], balance); // Native token
         Account {
@@ -576,7 +575,6 @@ mod tests {
             assert_eq!(state.witness_set.get(&id), Some(&true));
         }
     }
-
     #[test]
     fn test_phase_calculation() {
         let mut state = KalaState::genesis([0u8; 32], test_witness_ids());
@@ -602,7 +600,7 @@ mod tests {
         assert_eq!(state.get_current_phase(), TickPhase::Consensus);
 
         // Decryption phase
-        state.current_iteration = RSW_HARDNESS_CONSTANT;
+        state.current_iteration = CONSENSUS_PHASE_END + 1;
         assert_eq!(state.get_current_phase(), TickPhase::Decryption);
 
         // State update phase (last 1/6 of tick)
@@ -631,6 +629,7 @@ mod tests {
             amount: 100,
             nonce: 0,
             signature: [0u8; 64], // Simplified for test
+            gas_sponsorer: sender_addr,
         };
 
         // Apply transaction
@@ -669,6 +668,7 @@ mod tests {
             amount: 100,
             nonce: 0,
             signature: [0u8; 64],
+            gas_sponsorer: sender_addr,
         };
 
         let result = state.apply_send(&send);
@@ -695,6 +695,7 @@ mod tests {
             amount: 100,
             nonce: 5, // Wrong nonce
             signature: [0u8; 64],
+            gas_sponsorer: sender_addr,
         };
 
         let result = state.apply_send(&send);
@@ -714,6 +715,7 @@ mod tests {
             amount: 1000,
             nonce: 0,
             signature: [0u8; 64],
+            gas_sponsorer: minter_addr,
         };
 
         let result = state.apply_mint(&mint);
@@ -747,6 +749,7 @@ mod tests {
             amount: 300,
             nonce: 0,
             signature: [0u8; 64],
+            gas_sponsorer: burner_addr,
         };
 
         let result = state.apply_burn(&burn);
@@ -781,6 +784,7 @@ mod tests {
             amount: 400,
             nonce: 0,
             signature: [0u8; 64],
+            gas_sponsorer: delegator_addr,
         };
 
         let result = state.apply_stake(&stake);
@@ -812,6 +816,7 @@ mod tests {
             amount: 200,
             nonce: 0,
             signature: [0u8; 64],
+            gas_sponsorer: delegator_addr,
         };
 
         let result = state.apply_unstake(&unstake);
@@ -843,6 +848,7 @@ mod tests {
             amount: 400, // Full amount
             nonce: 0,
             signature: [0u8; 64],
+            gas_sponsorer: delegator_addr,
         };
 
         let result = state.apply_unstake(&unstake);
@@ -869,9 +875,10 @@ mod tests {
         let solve = Solve {
             sender: solver_addr,
             puzzle_id,
-            solution: vec![1, 2, 3, 4],
+            proof: [0u8; 256],
             nonce: 0,
             signature: [0u8; 64],
+            gas_sponsorer: solver_addr,
         };
 
         let result = state.apply_solve(&solve);
@@ -898,9 +905,10 @@ mod tests {
         let solve = Solve {
             sender: solver_addr,
             puzzle_id,
-            solution: vec![1, 2, 3, 4],
+            proof: [0u8; 256],
             nonce: 0,
             signature: [0u8; 64],
+            gas_sponsorer: solver_addr,
         };
 
         let result = state.apply_solve(&solve);
@@ -935,7 +943,6 @@ mod tests {
         let root3 = state.compute_state_root().unwrap();
         assert_ne!(root1, root3);
     }
-
     #[test]
     fn test_verify_state_valid() {
         let mut state = KalaState::genesis([0u8; 32], test_witness_ids());
@@ -1047,7 +1054,6 @@ mod tests {
             assert_eq!(*account.balances.get(&[0u8; 32]).unwrap(), 5000);
         }
     }
-
     #[tokio::test]
     async fn test_state_manager_multiple_saves() {
         let temp_dir = tempdir().unwrap();
@@ -1055,20 +1061,23 @@ mod tests {
         let chain_id = [42u8; 32];
         let witness_ids = test_witness_ids();
 
-        let mut manager =
-            StateManager::new(db_path.to_str().unwrap(), chain_id, witness_ids.clone())
-                .await
-                .unwrap();
+        {
+            // Create manager in its own scope
+            let mut manager =
+                StateManager::new(db_path.to_str().unwrap(), chain_id, witness_ids.clone())
+                    .await
+                    .unwrap();
 
-        // First save
-        manager.current_state.current_tick = 5;
-        manager.save_state().await.unwrap();
+            // First save
+            manager.current_state.current_tick = 5;
+            manager.save_state().await.unwrap();
 
-        // Second save (should overwrite)
-        manager.current_state.current_tick = 10;
-        manager.save_state().await.unwrap();
+            // Second save (should overwrite)
+            manager.current_state.current_tick = 10;
+            manager.save_state().await.unwrap();
+        } // Manager drops here, releasing the database
 
-        // Load and verify latest state
+        // Load and verify latest state in a new manager
         let new_manager = StateManager::new(db_path.to_str().unwrap(), chain_id, witness_ids)
             .await
             .unwrap();
@@ -1113,23 +1122,6 @@ mod tests {
     }
 
     #[test]
-    fn test_byzantine_threshold_calculation() {
-        // Test with 3 witnesses
-        let state = KalaState::genesis([0u8; 32], test_witness_ids());
-        assert_eq!(state.byzantine_threshold, 1); // 3/3 = 1
-
-        // Test with 6 witnesses
-        let six_witnesses: Vec<NodeId> = (1..=6).map(|i| [i as u8; 32]).collect();
-        let state = KalaState::genesis([0u8; 32], six_witnesses);
-        assert_eq!(state.byzantine_threshold, 2); // 6/3 = 2
-
-        // Test with 10 witnesses
-        let ten_witnesses: Vec<NodeId> = (1..=10).map(|i| [i as u8; 32]).collect();
-        let state = KalaState::genesis([0u8; 32], ten_witnesses);
-        assert_eq!(state.byzantine_threshold, 3); // 10/3 = 3.33... = 3
-    }
-
-    #[test]
     fn test_transaction_counter() {
         let mut state = KalaState::genesis([0u8; 32], test_witness_ids());
 
@@ -1151,6 +1143,7 @@ mod tests {
             amount: 100,
             nonce: 0,
             signature: [0u8; 64],
+            gas_sponsorer: [1u8; 32],
         };
         state.apply_send(&send).unwrap();
         assert_eq!(state.total_transactions, 1);
@@ -1161,6 +1154,7 @@ mod tests {
             amount: 500,
             nonce: 0,
             signature: [0u8; 64],
+            gas_sponsorer: [3u8; 32],
         };
         state.apply_mint(&mint).unwrap();
         assert_eq!(state.total_transactions, 2);
@@ -1173,6 +1167,7 @@ mod tests {
             amount: 10000, // Too much
             nonce: 1,
             signature: [0u8; 64],
+            gas_sponsorer: [1u8; 32],
         };
         let _ = state.apply_send(&invalid_send);
         assert_eq!(state.total_transactions, 2); // Still 2

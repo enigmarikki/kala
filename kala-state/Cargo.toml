@@ -39,3 +39,5 @@ sha2 = { workspace = true }                                # Hash functions for 
 anyhow = { workspace = true }                              # Error handling
 tracing = { workspace = true }                             # Structured logging
 rug = { workspace = true }                                 # High-precision arithmetic for forms
+tempfile = {version = "*"}
+tokio = {version = "*"}
