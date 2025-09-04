@@ -8,8 +8,8 @@ use serde_with::{serde_as, Bytes};
 pub type Bytes32 = [u8; 32];
 pub type Bytes64 = [u8; 64];
 pub type Bytes256 = [u8; 256];
-pub type Tag128 = [u8; 128];
-pub type Nonce96 = [u8; 96];
+pub type Tag128 = [u8; 16];
+pub type Nonce96 = [u8; 12];
 // Transaction structs
 #[serde_as]
 #[derive(Debug, Clone, Serialize, Deserialize)]
