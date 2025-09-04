@@ -1,14 +1,14 @@
 //! Cryptographic utilities and hash operations
 
-use sha2::{Digest, Sha256};
 use crate::{
-    types::{Hash, PublicKey, Signature, HashExt, PublicKeyExt, SignatureExt}, 
-    error::KalaResult
+    error::KalaResult,
+    types::{Hash, HashExt, PublicKey, PublicKeyExt, Signature, SignatureExt},
 };
+use sha2::{Digest, Sha256};
 
 /// Cryptographic constants
 pub const HASH_SIZE: usize = 32;
-pub const PUBKEY_SIZE: usize = 32;  
+pub const PUBKEY_SIZE: usize = 32;
 pub const SIGNATURE_SIZE: usize = 64;
 
 /// Central cryptographic utilities
@@ -44,6 +44,32 @@ impl CryptoUtils {
         computed_hash == *expected_hash
     }
 
+    /// Compute merkle root from pre-computed hashes
+    pub fn merkle_root_from_hashes(hashes: &[Hash]) -> Hash {
+        if hashes.is_empty() {
+            return HashExt::zero();
+        }
+
+        let mut current = hashes.to_vec();
+
+        while current.len() > 1 {
+            let mut next_level = Vec::new();
+
+            for chunk in current.chunks(2) {
+                if chunk.len() == 2 {
+                    let combined = [chunk[0], chunk[1]].concat();
+                    next_level.push(Self::hash(&combined));
+                } else {
+                    next_level.push(chunk[0]);
+                }
+            }
+
+            current = next_level;
+        }
+
+        current[0]
+    }
+
     /// Generate random bytes (for testing/dev purposes)
     #[cfg(feature = "dev")]
     pub fn random_bytes<const N: usize>() -> [u8; N] {
@@ -55,25 +81,27 @@ impl CryptoUtils {
 
     /// Validate public key format
     pub fn validate_pubkey(pubkey: &PublicKey) -> bool {
-        !PublicKeyExt::is_zero(pubkey) && pubkey.iter().any(|&b| b != 0)
+        !PublicKeyExt::is_zero(pubkey)
     }
 
     /// Validate signature format
     pub fn validate_signature(signature: &Signature) -> bool {
-        !SignatureExt::is_zero(signature) && signature.iter().any(|&b| b != 0)
+        !signature.is_zero()
     }
 
     /// Convert hex string to hash
     pub fn hex_to_hash(hex_str: &str) -> KalaResult<Hash> {
         if hex_str.len() != HASH_SIZE * 2 {
-            return Err(crate::error::KalaError::validation(
-                format!("Invalid hash length: expected {}, got {}", HASH_SIZE * 2, hex_str.len())
-            ));
+            return Err(crate::error::KalaError::validation(format!(
+                "Invalid hash length: expected {}, got {}",
+                HASH_SIZE * 2,
+                hex_str.len()
+            )));
         }
 
         let bytes = hex::decode(hex_str)
             .map_err(|e| crate::error::KalaError::validation(format!("Invalid hex: {}", e)))?;
-        
+
         let mut hash = [0u8; HASH_SIZE];
         hash.copy_from_slice(&bytes);
         Ok(hash)
@@ -107,7 +135,7 @@ impl MerkleTree {
         // Build tree bottom-up
         while current_level > 1 {
             let mut next_level = Vec::new();
-            
+
             for i in (0..current_level).step_by(2) {
                 let left = nodes[i];
                 let right = if i + 1 < current_level {
@@ -115,11 +143,11 @@ impl MerkleTree {
                 } else {
                     left // Duplicate if odd number
                 };
-                
+
                 let parent = CryptoUtils::hash_multiple(&[&left, &right]);
                 next_level.push(parent);
             }
-            
+
             nodes.extend_from_slice(&next_level);
             current_level = next_level.len();
         }
@@ -190,19 +218,42 @@ mod tests {
         let hash1 = CryptoUtils::hash(data);
         let hash2 = CryptoUtils::hash(data);
         assert_eq!(hash1, hash2);
-        assert_ne!(hash1, Hash::zero());
+        assert_ne!(hash1, [0u8; 32]);
     }
 
     #[test]
     fn test_hash_chain() {
         let data1 = b"first";
         let data2 = b"second";
-        
+
         let hash1 = CryptoUtils::hash(data1);
         let chain_hash = CryptoUtils::hash_chain(&hash1, data2);
-        
+
         let expected = CryptoUtils::hash_multiple(&[&hash1, data2]);
         assert_eq!(chain_hash, expected);
+    }
+
+    #[test]
+    fn test_merkle_root_from_hashes() {
+        let hashes = vec![
+            CryptoUtils::hash(b"test1"),
+            CryptoUtils::hash(b"test2"),
+            CryptoUtils::hash(b"test3"),
+        ];
+
+        let root = CryptoUtils::merkle_root_from_hashes(&hashes);
+        assert_ne!(root, [0u8; 32]);
+
+        // Test empty case
+        let empty: Vec<Hash> = vec![];
+        let empty_root = CryptoUtils::merkle_root_from_hashes(&empty);
+        assert_eq!(empty_root, [0u8; 32]);
+
+        // Test single hash
+        let single_hash = CryptoUtils::hash(b"single");
+        let single = vec![single_hash];
+        let single_root = CryptoUtils::merkle_root_from_hashes(&single);
+        assert_eq!(single_root, single_hash);
     }
 
     #[test]

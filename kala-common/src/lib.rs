@@ -17,19 +17,19 @@
 //!
 //! ```rust
 //! use kala_common::prelude::*;
-//! 
+//!
 //! #[derive(Serialize, Deserialize)]
 //! struct MyData {
 //!     id: u64,
 //!     name: String,
 //! }
-//! 
+//!
 //! impl KalaSerialize for MyData {
 //!     fn preferred_encoding() -> EncodingType {
 //!         EncodingType::Bincode
 //!     }
 //! }
-//! 
+//!
 //! // Use standardized serialization
 //! let data = MyData { id: 1, name: "test".to_string() };
 //! let encoded = data.encode()?;
@@ -39,26 +39,24 @@
 #![warn(missing_docs)]
 #![warn(rustdoc::missing_crate_level_docs)]
 
-pub mod serialization;
-pub mod network;
 pub mod crypto;
 pub mod database;
-pub mod validation;
-pub mod types;
 pub mod error;
+pub mod network;
+pub mod types;
+pub mod validation;
 
 /// Re-export commonly used types and traits
 pub mod prelude {
-    pub use crate::serialization::{KalaSerialize, EncodingType, HashCompute, NetworkMessage};
-    pub use crate::network::{NetworkLayer, MessageHandler, MessageType, NetworkConfig};
     pub use crate::crypto::{CryptoUtils, HASH_SIZE, PUBKEY_SIZE, SIGNATURE_SIZE};
     pub use crate::database::{DatabaseOps, KalaDatabase};
-    pub use crate::validation::ValidationUtils;
-    pub use crate::types::{NodeId, Timestamp, BlockHeight, IterationNumber, HashExt, PublicKeyExt, SignatureExt};
     pub use crate::error::{KalaError, KalaResult};
-    
+    pub use crate::types::{
+        HashExt, IterationNumber, NodeId, PublicKeyExt, SignatureExt, TickNumber, Timestamp,
+    };
+    pub use crate::validation::ValidationUtils;
+
     // Re-export essential external crates
-    pub use serde::{Serialize, Deserialize};
     pub use anyhow::Result;
 }
 

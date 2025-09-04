@@ -24,8 +24,8 @@ repository.workspace = true
 [dependencies]
 # Internal Kala crates
 kala-common = { workspace = true }                         # Shared types and database utilities
-kala-vdf = { workspace = true }                            # VDF types for checkpoints
-
+kala-tick = { workspace = true }                           # CVDF streaming implementation
+kala-transaction = {workspace = true}
 # Database and persistence
 rocksdb = { workspace = true }                             # High-performance key-value store
 
@@ -38,3 +38,6 @@ serde_json = { workspace = true }                          # JSON serialization 
 sha2 = { workspace = true }                                # Hash functions for tick certificates
 anyhow = { workspace = true }                              # Error handling
 tracing = { workspace = true }                             # Structured logging
+rug = { workspace = true }                                 # High-precision arithmetic for forms
+tempfile = {version = "*"}
+tokio = {version = "*"}
