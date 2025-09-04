@@ -1,8 +1,9 @@
 use crate::classgroup::ClassGroup;
 use crate::discriminant::Discriminant;
 use crate::form::QuadraticForm;
-use crate::types::CVDFError;
 use blake3::Hasher;
+use kala_common::error::{CVDFError, KalaError};
+use kala_common::prelude::KalaResult;
 use rug::integer::Order;
 use rug::Integer;
 use serde::{Deserialize, Serialize};
@@ -26,7 +27,7 @@ impl PietrzakProof {
         g: &QuadraticForm,
         y: &QuadraticForm,
         t: usize,
-    ) -> Result<Self, CVDFError> {
+    ) -> KalaResult<Self> {
         if t == 0 {
             return Ok(PietrzakProof { mu_values: vec![] });
         }
@@ -65,7 +66,7 @@ impl PietrzakProof {
         g: &QuadraticForm,
         y: &QuadraticForm,
         t: usize,
-    ) -> Result<bool, CVDFError> {
+    ) -> KalaResult<bool> {
         if t == 0 {
             return Ok(g == y);
         }
@@ -188,7 +189,7 @@ impl CVDFProof {
         starting_value: &QuadraticForm,
         base_difficulty: usize,
         security_param: usize,
-    ) -> Result<bool, CVDFError> {
+    ) -> KalaResult<bool> {
         // First, verify all VDF proofs for leaves
         for ((level, _idx), node) in &self.proof_path {
             if *level == 0 {
@@ -329,12 +330,14 @@ impl CVDFFrontier {
         }
     }
 
-    pub fn checkpoint(&self) -> Result<Vec<u8>, CVDFError> {
-        bincode::serialize(self).map_err(|e| CVDFError::SerializationError(e.to_string()))
+    pub fn checkpoint(&self) -> KalaResult<Vec<u8>> {
+        bincode::serialize(self)
+            .map_err(|e| KalaError::CVDFError(CVDFError::SerializationError(e.to_string())))
     }
 
-    pub fn from_checkpoint(data: &[u8]) -> Result<Self, CVDFError> {
-        bincode::deserialize(data).map_err(|e| CVDFError::DeserializationError(e.to_string()))
+    pub fn from_checkpoint(data: &[u8]) -> KalaResult<Self> {
+        bincode::deserialize(data)
+            .map_err(|e| KalaError::CVDFError(CVDFError::DeserializationError(e.to_string())))
     }
 }
 
@@ -386,12 +389,15 @@ impl CVDFStreamer {
     }
 
     /// Initialize with a specific starting value
-    pub fn initialize(&mut self, start_form: QuadraticForm) -> Result<(), CVDFError> {
+    pub fn initialize(&mut self, start_form: QuadraticForm) -> KalaResult<()> {
         if !start_form.is_valid(&self.config.discriminant) {
-            return Err(CVDFError::InvalidElement);
+            return Err(KalaError::CVDFError(CVDFError::InvalidElement));
         }
 
-        let mut frontier = self.frontier.write()?;
+        let mut frontier = self
+            .frontier
+            .write()
+            .map_err(|e| KalaError::CVDFError(e.into()))?;
         frontier.starting_value = start_form.reduce();
         frontier.current_time = 0;
         frontier.nodes.clear();
@@ -401,13 +407,10 @@ impl CVDFStreamer {
 
     /// Compute a single VDF step (just one squaring operation)
     /// This is much more reasonable than 2^T iterations!
-    pub fn compute_single_step(
-        &mut self,
-        input: &QuadraticForm,
-    ) -> Result<CVDFStepResult, CVDFError> {
+    pub fn compute_single_step(&mut self, input: &QuadraticForm) -> KalaResult<CVDFStepResult> {
         // Validate input
         if !input.is_valid(&self.config.discriminant) {
-            return Err(CVDFError::InvalidElement);
+            return Err(KalaError::CVDFError(CVDFError::InvalidElement));
         }
 
         // Perform a single squaring operation
@@ -430,11 +433,11 @@ impl CVDFStreamer {
         &mut self,
         input: &QuadraticForm,
         k: usize,
-    ) -> Result<CVDFStepResult, CVDFError> {
+    ) -> KalaResult<CVDFStepResult> {
         if k > 1_000_000 {
-            return Err(CVDFError::ComputationError(
+            return Err(KalaError::CVDFError(CVDFError::ComputationError(
                 "Too many steps requested".to_string(),
-            ));
+            )));
         }
 
         let mut current = input.clone();
@@ -467,8 +470,11 @@ impl CVDFStreamer {
     }
 
     /// Perform aggregation starting from a level
-    fn perform_aggregation(&self, start_level: usize) -> Result<(), CVDFError> {
-        let mut frontier = self.frontier.write()?;
+    fn perform_aggregation(&self, start_level: usize) -> KalaResult<()> {
+        let mut frontier = self
+            .frontier
+            .write()
+            .map_err(|e| KalaError::CVDFError(e.into()))?;
         Self::try_aggregate_internal(&self.class_group, &self.config, &mut frontier, start_level)
     }
 
@@ -478,7 +484,7 @@ impl CVDFStreamer {
         config: &Arc<CVDFConfig>,
         frontier: &mut CVDFFrontier,
         level: usize,
-    ) -> Result<(), CVDFError> {
+    ) -> KalaResult<()> {
         let k = frontier.arity;
         let mut start_index = 0;
         let mut parents_to_add = Vec::new();
@@ -490,9 +496,9 @@ impl CVDFStreamer {
         loop {
             iteration_count += 1;
             if iteration_count > max_iterations {
-                return Err(CVDFError::ComputationError(
+                return Err(KalaError::CVDFError(CVDFError::ComputationError(
                     "Aggregation loop exceeded maximum iterations".to_string(),
-                ));
+                )));
             }
 
             // Check if we have k consecutive nodes
@@ -514,7 +520,7 @@ impl CVDFStreamer {
                 let child = frontier
                     .nodes
                     .get(&(level, start_index + i))
-                    .ok_or(CVDFError::InvalidStateTransition)?
+                    .ok_or(KalaError::CVDFError(CVDFError::InvalidStateTransition))?
                     .clone();
                 children.push(child);
             }
@@ -562,8 +568,11 @@ impl CVDFStreamer {
     }
 
     /// Generate a verifiable proof for the current computation
-    pub fn generate_proof(&self) -> Result<CVDFProof, CVDFError> {
-        let frontier = self.frontier.read()?;
+    pub fn generate_proof(&self) -> KalaResult<CVDFProof> {
+        let frontier = self
+            .frontier
+            .read()
+            .map_err(|e| KalaError::CVDFError(e.into()))?;
         Ok(frontier.generate_proof())
     }
 
@@ -572,7 +581,7 @@ impl CVDFStreamer {
         proof: &CVDFProof,
         config: &CVDFConfig,
         starting_value: &QuadraticForm,
-    ) -> Result<bool, CVDFError> {
+    ) -> KalaResult<bool> {
         let class_group = ClassGroup::new(config.discriminant.clone());
         proof.verify(
             &class_group,
@@ -588,7 +597,7 @@ impl CVDFStreamer {
         &self,
         input: &QuadraticForm,
         output: &QuadraticForm,
-    ) -> Result<CVDFStepProof, CVDFError> {
+    ) -> KalaResult<CVDFStepProof> {
         // For single squaring, we can just hash the input/output pair
         // This is much lighter than full Pietrzak proofs
         let mut hasher = blake3::Hasher::new();
@@ -612,9 +621,9 @@ impl CVDFStreamer {
     pub fn aggregate_proof_chain(
         &self,
         proof_chain: Vec<CVDFStepProof>,
-    ) -> Result<CVDFStepProof, CVDFError> {
+    ) -> KalaResult<CVDFStepProof> {
         if proof_chain.is_empty() {
-            return Err(CVDFError::InvalidProof { step: 0 });
+            return Err(KalaError::CVDFError(CVDFError::InvalidProof { step: 0 }));
         }
 
         // For now, just aggregate the first and last
@@ -640,7 +649,7 @@ impl CVDFStreamer {
     }
 
     /// Stream computation (legacy compatibility - now much more reasonable!)
-    pub fn stream_computation(&mut self, steps: usize) -> Result<Vec<ProofNode>, CVDFError> {
+    pub fn stream_computation(&mut self, steps: usize) -> KalaResult<Vec<ProofNode>> {
         // This is now much more reasonable - just k steps instead of 2^T!
         let identity = QuadraticForm::identity(&self.config.discriminant);
         let result = self.compute_k_steps(&identity, steps)?;
@@ -654,20 +663,29 @@ impl CVDFStreamer {
     }
 
     /// Get progress
-    pub fn get_progress(&self) -> Result<(usize, usize), CVDFError> {
-        let frontier = self.frontier.read()?;
+    pub fn get_progress(&self) -> KalaResult<(usize, usize)> {
+        let frontier = self
+            .frontier
+            .read()
+            .map_err(|e| KalaError::CVDFError(e.into()))?;
         Ok((frontier.current_time, frontier.nodes.len()))
     }
 
     /// Export/import for handoff
-    pub fn export_state(&self) -> Result<Vec<u8>, CVDFError> {
-        let frontier = self.frontier.read()?;
+    pub fn export_state(&self) -> KalaResult<Vec<u8>> {
+        let frontier = self
+            .frontier
+            .read()
+            .map_err(|e| KalaError::CVDFError(e.into()))?;
         frontier.checkpoint()
     }
 
-    pub fn import_state(&mut self, data: &[u8]) -> Result<(), CVDFError> {
+    pub fn import_state(&mut self, data: &[u8]) -> KalaResult<()> {
         let imported = CVDFFrontier::from_checkpoint(data)?;
-        let mut frontier = self.frontier.write()?;
+        let mut frontier = self
+            .frontier
+            .write()
+            .map_err(|e| KalaError::CVDFError(e.into()))?;
         *frontier = imported;
         Ok(())
     }
@@ -809,7 +827,7 @@ mod tests {
         let result = streamer.compute_k_steps(&starting_form, 2_000_000);
         assert!(result.is_err(), "Should reject excessive step counts");
 
-        if let Err(CVDFError::ComputationError(msg)) = result {
+        if let Err(KalaError::CVDFError(CVDFError::ComputationError(msg))) = result {
             assert!(msg.contains("Too many steps"));
         } else {
             panic!("Should return ComputationError for excessive steps");
@@ -836,7 +854,7 @@ mod tests {
         let result = streamer.compute_single_step(&invalid_form);
         assert!(result.is_err(), "Should reject invalid input");
 
-        if let Err(CVDFError::InvalidElement) = result {
+        if let Err(KalaError::CVDFError(CVDFError::InvalidElement)) = result {
             // Expected
         } else {
             panic!("Should return InvalidElement for wrong discriminant");

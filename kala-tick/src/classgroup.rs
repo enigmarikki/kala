@@ -1,7 +1,7 @@
 //kala-tick/src/classgroup.rs
 use crate::discriminant::Discriminant;
 use crate::form::QuadraticForm;
-use crate::types::CVDFError;
+use kala_common::{error::CVDFError, error::KalaError, prelude::KalaResult};
 use rug::ops::DivRounding;
 use rug::rand::RandState;
 use rug::Integer;
@@ -159,13 +159,9 @@ impl ClassGroup {
     }
 
     /// Compose two quadratic forms using NUCOMP algorithm
-    pub fn compose(
-        &self,
-        f1: &QuadraticForm,
-        f2: &QuadraticForm,
-    ) -> Result<QuadraticForm, CVDFError> {
+    pub fn compose(&self, f1: &QuadraticForm, f2: &QuadraticForm) -> KalaResult<QuadraticForm> {
         if !f1.is_valid(&self.discriminant) || !f2.is_valid(&self.discriminant) {
-            return Err(CVDFError::InvalidForm);
+            return Err(KalaError::CVDFError(CVDFError::InvalidForm));
         }
 
         let identity = QuadraticForm::identity(&self.discriminant);
@@ -266,9 +262,9 @@ impl ClassGroup {
     }
 
     /// Square a quadratic form using NUDUPL algorithm
-    pub fn square(&self, form: &QuadraticForm) -> Result<QuadraticForm, CVDFError> {
+    pub fn square(&self, form: &QuadraticForm) -> KalaResult<QuadraticForm> {
         if !form.is_valid(&self.discriminant) {
-            return Err(CVDFError::InvalidForm);
+            return Err(KalaError::CVDFError(CVDFError::InvalidForm));
         }
 
         let identity = QuadraticForm::identity(&self.discriminant);
@@ -352,23 +348,19 @@ impl ClassGroup {
     }
 
     /// Compute form^(2^t) through repeated squaring
-    pub fn repeated_squaring(
-        &self,
-        form: &QuadraticForm,
-        t: usize,
-    ) -> Result<QuadraticForm, CVDFError> {
+    pub fn repeated_squaring(&self, form: &QuadraticForm, t: usize) -> KalaResult<QuadraticForm> {
         // Add bounds checking to prevent hanging on large values
         if t > 100_000 {
-            return Err(CVDFError::ComputationError(
+            return Err(KalaError::CVDFError(CVDFError::ComputationError(
                 "Exponent too large for repeated squaring".to_string(),
-            ));
+            )));
         }
 
         let mut result = form.clone();
         for i in 0..t {
             // Add periodic validation to prevent infinite loops on invalid forms
             if i % 1000 == 0 && !result.is_valid(&self.discriminant) {
-                return Err(CVDFError::InvalidForm);
+                return Err(KalaError::CVDFError(CVDFError::InvalidForm));
             }
             result = self.square(&result)?;
         }
@@ -376,7 +368,7 @@ impl ClassGroup {
     }
 
     /// Compute form^n using binary exponentiation
-    pub fn pow(&self, form: &QuadraticForm, n: &Integer) -> Result<QuadraticForm, CVDFError> {
+    pub fn pow(&self, form: &QuadraticForm, n: &Integer) -> KalaResult<QuadraticForm> {
         if n == &0 {
             return Ok(QuadraticForm::identity(&self.discriminant));
         }
@@ -394,7 +386,7 @@ impl ClassGroup {
     }
 
     /// Generate a random class group element
-    pub fn random_element(&self) -> Result<QuadraticForm, CVDFError> {
+    pub fn random_element(&self) -> KalaResult<QuadraticForm> {
         let mut rand_state = RandState::new();
         let bits = min(self.discriminant.bit_length / 4, 256);
         let max_attempts = 100;
@@ -418,7 +410,7 @@ impl ClassGroup {
                 }
             }
         }
-        Err(CVDFError::InvalidForm)
+        Err(KalaError::CVDFError(CVDFError::InvalidForm))
     }
 }
 

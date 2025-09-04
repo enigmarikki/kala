@@ -1,5 +1,5 @@
 //kala-tick/src/discriminant.rs
-use crate::types::CVDFError;
+use kala_common::error::{CVDFError, KalaError, KalaResult};
 use rug::rand::RandState;
 use rug::Integer;
 use serde::{Deserialize, Serialize};
@@ -18,7 +18,7 @@ pub struct Discriminant {
 impl Discriminant {
     /// Generate a random negative discriminant
     /// Ensures -D ≡ 3 (mod 4) for unique factorization
-    pub fn generate(bits: u32) -> Result<Self, CVDFError> {
+    pub fn generate(bits: u32) -> KalaResult<Self> {
         // Create a random state using the default algorithm
         let mut rand_state = RandState::new();
 
@@ -63,16 +63,16 @@ impl Discriminant {
     }
 
     /// Create from a specific value (for testing or known discriminants)
-    pub fn from_value(value: Integer) -> Result<Self, CVDFError> {
+    pub fn from_value(value: Integer) -> KalaResult<Self> {
         if value >= 0 {
-            return Err(CVDFError::InvalidDiscriminant);
+            return Err(KalaError::CVDFError(CVDFError::InvalidDiscriminant));
         }
 
         // Check -D ≡ 3 (mod 4)
         let four = Integer::from(4);
         let neg_d = Integer::from(-&value);
         if neg_d.modulo(&four) != 3 {
-            return Err(CVDFError::InvalidDiscriminant);
+            return Err(KalaError::CVDFError(CVDFError::InvalidDiscriminant));
         }
 
         let bit_length = value.significant_bits();
@@ -80,16 +80,16 @@ impl Discriminant {
     }
 
     /// Create from a hex string (useful for Chia's discriminant)
-    pub fn from_hex(hex_str: &str) -> Result<Self, CVDFError> {
-        let value =
-            Integer::from_str_radix(hex_str, 16).map_err(|_| CVDFError::InvalidDiscriminant)?;
+    pub fn from_hex(hex_str: &str) -> KalaResult<Self> {
+        let value = Integer::from_str_radix(hex_str, 16)
+            .map_err(|_| KalaError::CVDFError(CVDFError::InvalidDiscriminant))?;
         Self::from_value(value)
     }
 
     /// Create from a decimal string
-    pub fn from_dec(dec_str: &str) -> Result<Self, CVDFError> {
-        let value =
-            Integer::from_str_radix(dec_str, 10).map_err(|_| CVDFError::InvalidDiscriminant)?;
+    pub fn from_dec(dec_str: &str) -> KalaResult<Self> {
+        let value = Integer::from_str_radix(dec_str, 10)
+            .map_err(|_| KalaError::CVDFError(CVDFError::InvalidDiscriminant))?;
         Self::from_value(value)
     }
 }

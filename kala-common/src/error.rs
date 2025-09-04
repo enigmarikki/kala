@@ -1,17 +1,75 @@
 //kala-common/src/error.rs
 //! Standardized error types for all Kala components
 
+use std::sync::PoisonError;
+use std::sync::{RwLockReadGuard, RwLockWriteGuard};
 use thiserror::Error;
-
 /// Standard result type used throughout Kala
 pub type KalaResult<T> = std::result::Result<T, KalaError>;
 
+#[derive(Error, Debug)]
+pub enum CVDFError {
+    #[error("Invalid discriminant")]
+    InvalidDiscriminant,
+
+    #[error("Invalid class group element")]
+    InvalidElement,
+
+    #[error("Invalid proof at step {step}")]
+    InvalidProof { step: usize },
+
+    #[error("Computation error: {0}")]
+    ComputationError(String),
+
+    #[error("Serialization error : {0}")]
+    SerializationError(String),
+
+    #[error("Deserialization error : {0}")]
+    DeserializationError(String),
+
+    #[error("Invalid state transition")]
+    InvalidStateTransition,
+
+    #[error("Frontier verification failed")]
+    FrontierVerificationFailed,
+
+    #[error("Reduction failed")]
+    ReductionFailed,
+
+    #[error("Division error")]
+    DivisionError,
+
+    #[error("Invalid form")]
+    InvalidForm,
+
+    #[error("Lock poisoned: {0}")]
+    LockPoisoned(String),
+}
+impl From<CVDFError> for KalaError {
+    fn from(err: CVDFError) -> Self {
+        KalaError::CVDFError(err)
+    }
+}
+impl<T> From<PoisonError<RwLockReadGuard<'_, T>>> for CVDFError {
+    fn from(err: PoisonError<RwLockReadGuard<'_, T>>) -> Self {
+        CVDFError::LockPoisoned(err.to_string())
+    }
+}
+
+impl<T> From<PoisonError<RwLockWriteGuard<'_, T>>> for CVDFError {
+    fn from(err: PoisonError<RwLockWriteGuard<'_, T>>) -> Self {
+        CVDFError::LockPoisoned(err.to_string())
+    }
+}
 /// Comprehensive error type for all Kala operations
 #[derive(Error, Debug)]
 pub enum KalaError {
     // Serialization errors
     #[error("Serialization error: {0}")]
     Serialization(String),
+    // Deserialization errors
+    #[error("Serialization error: {0}")]
+    Deserialization(String),
 
     // Network errors
     #[error("Network error: {0}")]
@@ -34,8 +92,8 @@ pub enum KalaError {
     Transaction(String),
 
     // VDF computation errors
-    #[error("VDF error: {0}")]
-    VDF(String),
+    #[error("CVDF error: {0}")]
+    CVDFError(CVDFError),
 
     // State management errors
     #[error("State error: {0}")]
@@ -84,8 +142,8 @@ impl KalaError {
     }
 
     /// Create a new VDF error
-    pub fn vdf(msg: impl Into<String>) -> Self {
-        Self::VDF(msg.into())
+    pub fn vdf(error: CVDFError) -> Self {
+        Self::CVDFError(error)
     }
 
     /// Create a new state error

@@ -429,6 +429,48 @@ impl KalaState {
 
         Ok(())
     }
+    pub fn update_vdf_state(
+        &mut self,
+        form: QuadraticForm,
+        proof: Vec<u8>,
+        iteration: IterationNumber,
+    ) {
+        self.vdf_current_form = form;
+        self.vdf_proof_cache.insert(iteration, proof);
+        self.total_iterations = iteration;
+    }
+
+    pub fn update_tick_state(
+        &mut self,
+        tick: TickNumber,
+        phase: TickPhase,
+        iteration: IterationNumber,
+    ) {
+        self.current_tick = tick;
+        self.current_phase = phase;
+        self.current_iteration = iteration;
+    }
+
+    pub fn add_envelope(&mut self, envelope: EncryptedEnvelope) {
+        self.pending_envelopes.push(envelope);
+    }
+
+    pub fn add_observation(&mut self, hash: Hash, observation: WitnessObservation) {
+        self.observations
+            .entry(hash)
+            .or_insert_with(Vec::new)
+            .push(observation);
+    }
+
+    pub fn add_decrypted_transaction(&mut self, hash: Hash, tx: Transaction) {
+        self.decrypted_transactions.insert(hash, tx);
+    }
+
+    pub fn store_tick(&mut self, tick_state: TickState) {
+        self.tick_history
+            .insert(tick_state.tick_number, tick_state.clone());
+        self.last_finalized_tick = tick_state.tick_number;
+    }
 }
 
 /// Persistent state storage
@@ -456,6 +498,26 @@ impl StateManager {
     pub async fn save_state(&self) -> KalaResult<()> {
         let storable = StorableState::from_kala_state(&self.current_state);
         self.db.store_typed("state", "current", &storable).await
+    }
+    pub fn get_state(&self) -> &KalaState {
+        &self.current_state
+    }
+
+    pub fn get_state_mut(&mut self) -> &mut KalaState {
+        &mut self.current_state
+    }
+
+    pub async fn export_state(&self) -> KalaResult<Vec<u8>> {
+        let storable = StorableState::from_kala_state(&self.current_state);
+        bincode::serialize(&storable)
+            .map_err(|e| KalaError::Serialization(format!("Failed to serialize: {}", e)))
+    }
+
+    pub async fn import_state(&mut self, data: &[u8]) -> KalaResult<()> {
+        let storable: StorableState = bincode::deserialize(data)
+            .map_err(|e| KalaError::Deserialization(format!("Failed to deserialize: {}", e)))?;
+        self.current_state = storable.to_kala_state();
+        self.save_state().await
     }
 }
 

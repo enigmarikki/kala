@@ -1310,6 +1310,7 @@ dependencies = [
  "criterion",
  "dashmap",
  "hex",
+ "kala-common",
  "num-bigint",
  "num-integer",
  "num-traits",
