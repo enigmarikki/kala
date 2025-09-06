@@ -83,8 +83,8 @@ impl ValidationUtils {
 
     /// Validate timestamp
     pub fn validate_timestamp(timestamp: Timestamp) -> KalaResult<()> {
-        const MIN_TIMESTAMP: u64 = 1609459200; // 2021-01-01
-        const MAX_TIMESTAMP: u64 = 32503680000; // 2999-12-31
+        const MIN_TIMESTAMP: u128 = 1609459200; // 2021-01-01
+        const MAX_TIMESTAMP: u128 = 32503680000; // 2999-12-31
 
         if timestamp < MIN_TIMESTAMP {
             return Err(KalaError::validation("Timestamp too old"));
@@ -99,7 +99,7 @@ impl ValidationUtils {
 
     /// Validate block height
     pub fn validate_block_height(height: TickNumber) -> KalaResult<()> {
-        const MAX_BLOCK_HEIGHT: u64 = u64::MAX / 2; // Reasonable upper bound
+        const MAX_BLOCK_HEIGHT: u128 = u128::MAX / 2; // Reasonable upper bound
 
         if height > MAX_BLOCK_HEIGHT {
             return Err(KalaError::validation("Block height too large"));
@@ -114,7 +114,7 @@ impl ValidationUtils {
             return Err(KalaError::validation("Iteration number cannot be zero"));
         }
 
-        const MAX_ITERATIONS: u64 = 1_000_000_000; // 1B iterations max
+        const MAX_ITERATIONS: u128 = 1_000_000_000; // 1B iterations max
 
         if iterations > MAX_ITERATIONS {
             return Err(KalaError::validation("Iteration number too large"));

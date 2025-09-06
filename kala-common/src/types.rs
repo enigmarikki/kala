@@ -7,13 +7,13 @@ use serde::{Deserialize, Serialize};
 pub type NodeId = [u8; 32];
 
 /// Timestamp in seconds since Unix epoch
-pub type Timestamp = u64;
+pub type Timestamp = u128;
 
 /// Tick number
-pub type TickNumber = u64;
+pub type TickNumber = u128;
 
 /// VDF iteration number
-pub type IterationNumber = u64;
+pub type IterationNumber = u128;
 
 /// Hash type - 32-byte SHA-256
 pub type Hash = [u8; 32];

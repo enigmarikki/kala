@@ -10,8 +10,6 @@ use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::sync::{Arc, RwLock};
 
-const MAX_PROOF_ITERATIONS: i32 = 2_000_000;
-
 /// Pietrzak proof for a single VDF evaluation
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct PietrzakProof {
@@ -151,7 +149,7 @@ pub struct CVDFStepProof {
     /// Output form  
     pub output: QuadraticForm,
     /// Proof data (much lighter than full Pietrzak)
-    pub proof_data: Vec<u8>,
+    pub proof_data: [u8; 32],
 }
 
 /// A node in the CVDF tree with proof (legacy for complex proofs)
@@ -608,12 +606,12 @@ impl CVDFStreamer {
         hasher.update(output.b.to_string_radix(16).as_bytes());
         hasher.update(output.c.to_string_radix(16).as_bytes());
 
-        let proof_hash = hasher.finalize();
+        let proof_hash: [u8; 32] = hasher.finalize().into();
 
         Ok(CVDFStepProof {
             input: input.clone(),
             output: output.clone(),
-            proof_data: proof_hash.as_bytes().to_vec(),
+            proof_data: proof_hash,
         })
     }
 
@@ -639,12 +637,12 @@ impl CVDFStreamer {
             hasher.update(&proof.proof_data);
         }
 
-        let aggregated_hash = hasher.finalize();
+        let aggregated_hash: [u8; 32] = hasher.finalize().into();
 
         Ok(CVDFStepProof {
             input: first.input.clone(),
             output: last.output.clone(),
-            proof_data: aggregated_hash.as_bytes().to_vec(),
+            proof_data: aggregated_hash,
         })
     }
 

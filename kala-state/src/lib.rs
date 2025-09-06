@@ -1,14 +1,13 @@
 // kala-state/src/lib.rs
-use kala_common::types::NetworkParams;
 use kala_common::{
     crypto::CryptoUtils,
-    database::{DatabaseOps, KalaDatabase, TypedDatabaseOps},
+    database::{KalaDatabase, TypedDatabaseOps},
     error::{KalaError, KalaResult},
-    types::{Hash, HashExt, IterationNumber, NodeId, PublicKey, Signature, TickNumber, Timestamp},
+    types::{Hash, IterationNumber, NodeId, Signature, TickNumber},
 };
 use kala_tick::{Discriminant, QuadraticForm};
 use kala_transaction::types::{
-    Burn, Bytes32, Mint, RSWPuzzle, Send, Solve, Stake, TimelockTransaction, Transaction, Unstake,
+    Burn, Bytes32, Mint, Send, Solve, Stake, TimelockTransaction, Transaction, Unstake,
 };
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
@@ -30,7 +29,7 @@ pub struct WitnessObservation {
     pub envelope_hash: Hash,
     pub iteration_seen: IterationNumber,
     pub chain_id: NodeId,
-    pub vdf_proof: Vec<u8>,
+    pub vdf_proof: [u8; 32],
 }
 
 /// Canonical timestamp after Byzantine agreement
@@ -96,26 +95,30 @@ pub struct KalaState {
     pub current_phase: TickPhase,
 
     // VDF state from kala_tick
-    pub vdf_discriminant: Discriminant,
-    pub vdf_current_form: QuadraticForm,
-    pub vdf_proof_cache: BTreeMap<IterationNumber, Vec<u8>>,
+    pub cvdf_discriminant: Discriminant,
+    pub cvdf_current_form: QuadraticForm,
+    pub cvdf_proof_cache: BTreeMap<IterationNumber, [u8; 32]>,
 
     // Account state - BTreeMap for determinism
     pub accounts: BTreeMap<Bytes32, Account>,
     pub total_supply: BTreeMap<Bytes32, u64>,
 
     // Transaction processing
-    pub pending_envelopes: Vec<TimelockTransaction>,
+    pub pending_transactions: Vec<TimelockTransaction>,
     pub observations: BTreeMap<Hash, Vec<WitnessObservation>>,
     pub decrypted_transactions: BTreeMap<Hash, Transaction>,
 
     // Tick history
     pub tick_history: BTreeMap<TickNumber, TickState>,
     pub last_finalized_tick: TickNumber,
-
-    // Metrics
-    pub total_transactions: u64,
     pub total_iterations: IterationNumber,
+
+    // Network params
+    pub k_iterations: u128,
+    pub collection_phase_end: u128,
+    pub consensus_phase_end: u128,
+    pub rsw_hardness: u128
+
 }
 // Helper function to create test witness IDs
 pub fn test_witness_ids() -> Vec<NodeId> {
@@ -135,11 +138,12 @@ pub fn create_test_account(address: Bytes32, balance: u64) -> Account {
     }
 }
 impl KalaState {
+    
     pub fn genesis(chain_id: NodeId, witness_ids: Vec<NodeId>) -> Self {
         let witness_set: BTreeMap<NodeId, bool> =
             witness_ids.into_iter().map(|id| (id, true)).collect();
         let byzantine_threshold =
-            witness_set.len() / NetworkParams::BYZANTINE_THRESHOLD_DENOMINATOR;
+            witness_set.len() / 3;
 
         let vdf_discriminant = Self::default_discriminant();
         let vdf_current_form = QuadraticForm::identity(&vdf_discriminant);
@@ -151,18 +155,21 @@ impl KalaState {
             current_tick: 0,
             current_iteration: 0,
             current_phase: TickPhase::Collection,
-            vdf_discriminant,
-            vdf_current_form,
-            vdf_proof_cache: BTreeMap::new(),
+            cvdf_discriminant,
+            cvdf_current_form,
+            cvdf_proof_cache: BTreeMap::new(),
             accounts: BTreeMap::new(),
             total_supply: BTreeMap::new(),
-            pending_envelopes: Vec::new(),
+            pending_transactions: Vec::new(),
             observations: BTreeMap::new(),
             decrypted_transactions: BTreeMap::new(),
             tick_history: BTreeMap::new(),
             last_finalized_tick: 0,
-            total_transactions: 0,
             total_iterations: 0,
+            k_iterations: 163840,
+            collection_phase_end: 43690,
+            consensus_phase_end: 65536,
+            rsw_hardness: 65536
         }
     }
 
@@ -174,13 +181,13 @@ impl KalaState {
     }
 
     pub fn get_current_phase(&self) -> TickPhase {
-        let iteration_in_tick = self.current_iteration % NetworkParams::K_ITERATIONS;
-        if iteration_in_tick < NetworkParams::COLLECTION_PHASE_END {
+        let iteration_in_tick = self.current_iteration % self.k_iterations;
+        if iteration_in_tick < self.collection_phase_end {
             TickPhase::Collection
-        } else if iteration_in_tick < NetworkParams::CONSENSUS_PHASE_END {
+        } else if iteration_in_tick < self.consensus_phase_end {
             TickPhase::Consensus
         } else if iteration_in_tick
-            < NetworkParams::CONSENSUS_PHASE_END + NetworkParams::RSW_HARDNESS_CONSTANT
+            < self.consensus_phase_end + self.rsw_hardness
         {
             TickPhase::Decryption
         } else {
@@ -257,7 +264,6 @@ impl KalaState {
             .balances
             .insert(send.denom, receiver_balance + send.amount);
 
-        self.total_transactions += 1;
         Ok(())
     }
 
@@ -283,7 +289,6 @@ impl KalaState {
         let total = self.total_supply.entry(mint.denom).or_insert(0);
         *total += mint.amount;
 
-        self.total_transactions += 1;
         Ok(())
     }
 
@@ -310,7 +315,6 @@ impl KalaState {
             *total = total.saturating_sub(burn.amount);
         }
 
-        self.total_transactions += 1;
         Ok(())
     }
 
@@ -342,7 +346,6 @@ impl KalaState {
             .insert(stake.witness, current_stake + stake.amount);
         account.nonce += 1;
 
-        self.total_transactions += 1;
         Ok(())
     }
 
@@ -377,7 +380,6 @@ impl KalaState {
         }
         account.nonce += 1;
 
-        self.total_transactions += 1;
         Ok(())
     }
 
@@ -402,7 +404,6 @@ impl KalaState {
 
         // Add puzzle reward logic here
 
-        self.total_transactions += 1;
         Ok(())
     }
 
@@ -425,8 +426,8 @@ impl KalaState {
 
         // Verify iteration count
         if self.current_iteration
-            != self.current_tick * NetworkParams::K_ITERATIONS
-                + (self.current_iteration % NetworkParams::K_ITERATIONS)
+            != self.current_tick * self.k_iterations
+                + (self.current_iteration % self.k_iterations)
         {
             return Err(KalaError::validation("Iteration count inconsistent"));
         }
@@ -456,7 +457,7 @@ impl KalaState {
     }
 
     pub fn add_envelope(&mut self, envelope: TimelockTransaction) {
-        self.pending_envelopes.push(envelope);
+        self.pending_transactions.push(envelope);
     }
 
     pub fn add_observation(&mut self, hash: Hash, observation: WitnessObservation) {
@@ -579,18 +580,21 @@ impl StorableState {
             current_tick: self.current_tick,
             current_iteration: self.current_iteration,
             current_phase: self.current_phase,
-            vdf_discriminant: discriminant,
-            vdf_current_form: form,
-            vdf_proof_cache: BTreeMap::new(),
+            cvdf_discriminant: discriminant,
+            cvdf_current_form: form,
+            cvdf_proof_cache: BTreeMap::new(),
             accounts: self.accounts.clone(),
             total_supply: self.total_supply.clone(),
-            pending_envelopes: Vec::new(),
+            pending_transactions: Vec::new(),
             observations: BTreeMap::new(),
             decrypted_transactions: BTreeMap::new(),
             tick_history: BTreeMap::new(),
             last_finalized_tick: 0,
-            total_transactions: 0,
             total_iterations: 0,
+            k_iterations: 163840,
+            collection_phase_end: 43690,
+            consensus_phase_end: 65536,
+            rsw_hardness: 65536
         }
     }
 }
@@ -633,7 +637,6 @@ mod tests {
         assert_eq!(state.current_phase, TickPhase::Collection);
         assert!(state.accounts.is_empty());
         assert!(state.total_supply.is_empty());
-        assert_eq!(state.total_transactions, 0);
         assert_eq!(state.total_iterations, 0);
 
         // Verify all witnesses are active
@@ -651,26 +654,25 @@ mod tests {
         state.current_iteration = 10000;
         assert_eq!(state.get_current_phase(), TickPhase::Collection);
 
-        state.current_iteration = NetworkParams::COLLECTION_PHASE_END - 1;
+        state.current_iteration = state.k_iterations - 1;
         assert_eq!(state.get_current_phase(), TickPhase::Collection);
 
         // Consensus phase (21845 - 43689)
-        state.current_iteration = NetworkParams::COLLECTION_PHASE_END;
+        state.current_iteration = state.consensus_phase_end;
         assert_eq!(state.get_current_phase(), TickPhase::Consensus);
 
         state.current_iteration = 50000;
         assert_eq!(state.get_current_phase(), TickPhase::Consensus);
 
-        state.current_iteration = NetworkParams::CONSENSUS_PHASE_END - 1;
+        state.current_iteration = state.consensus_phase_end - 1;
         assert_eq!(state.get_current_phase(), TickPhase::Consensus);
 
         // Decryption phase
-        state.current_iteration = NetworkParams::CONSENSUS_PHASE_END + 1;
+        state.current_iteration = state.consensus_phase_end + 1;
         assert_eq!(state.get_current_phase(), TickPhase::Decryption);
 
-        // State update phase (last 1/6 of tick)
         state.current_iteration =
-            NetworkParams::CONSENSUS_PHASE_END + NetworkParams::RSW_HARDNESS_CONSTANT + 1;
+            state.consensus_phase_end + state.rsw_hardness + 1;
         assert_eq!(state.get_current_phase(), TickPhase::StateUpdate);
     }
 
@@ -710,8 +712,6 @@ mod tests {
         // Verify receiver balance
         let receiver = state.accounts.get(&receiver_addr).unwrap();
         assert_eq!(*receiver.balances.get(&denom).unwrap(), 100);
-
-        assert_eq!(state.total_transactions, 1);
     }
 
     #[test]
@@ -739,7 +739,6 @@ mod tests {
 
         let result = state.apply_send(&send);
         assert!(result.is_err());
-        assert_eq!(state.total_transactions, 0);
     }
 
     #[test]
@@ -794,7 +793,6 @@ mod tests {
 
         // Verify total supply
         assert_eq!(*state.total_supply.get(&denom).unwrap(), 1000);
-        assert_eq!(state.total_transactions, 1);
     }
 
     #[test]
@@ -828,7 +826,6 @@ mod tests {
 
         // Verify total supply reduced
         assert_eq!(*state.total_supply.get(&denom).unwrap(), 700);
-        assert_eq!(state.total_transactions, 1);
     }
 
     #[test]
@@ -860,7 +857,6 @@ mod tests {
         assert_eq!(*account.balances.get(&native_denom).unwrap(), 600);
         assert_eq!(*account.stake.get(&witness_addr).unwrap(), 400);
         assert_eq!(account.nonce, 1);
-        assert_eq!(state.total_transactions, 1);
     }
 
     #[test]
@@ -892,7 +888,6 @@ mod tests {
         assert_eq!(*account.balances.get(&native_denom).unwrap(), 800);
         assert_eq!(*account.stake.get(&witness_addr).unwrap(), 200);
         assert_eq!(account.nonce, 1);
-        assert_eq!(state.total_transactions, 1);
     }
 
     #[test]
@@ -953,7 +948,6 @@ mod tests {
         let account = state.accounts.get(&solver_addr).unwrap();
         assert!(account.puzzles_solved.contains(&puzzle_id));
         assert_eq!(account.nonce, 1);
-        assert_eq!(state.total_transactions, 1);
     }
 
     #[test]
@@ -979,7 +973,6 @@ mod tests {
 
         let result = state.apply_solve(&solve);
         assert!(result.is_err());
-        assert_eq!(state.total_transactions, 0);
     }
 
     #[test]
@@ -1052,10 +1045,10 @@ mod tests {
         let mut state = KalaState::genesis([0u8; 32], test_witness_ids());
 
         state.current_tick = 5;
-        state.current_iteration = NetworkParams::K_ITERATIONS * 5 + 100; // Correct
+        state.current_iteration = state.k_iterations * 5 + 100; // Correct
         assert!(state.verify_state().is_ok());
 
-        state.current_iteration = NetworkParams::K_ITERATIONS * 6; // Wrong
+        state.current_iteration = state.k_iterations * 6; // Wrong
         assert!(state.verify_state().is_err());
     }
 
@@ -1091,7 +1084,7 @@ mod tests {
 
             // Modify state
             manager.current_state.current_tick = 10;
-            manager.current_state.current_iteration = NetworkParams::K_ITERATIONS * 10;
+            manager.current_state.current_iteration = manager.current_state.k_iterations * 10;
             manager
                 .current_state
                 .accounts
@@ -1111,7 +1104,7 @@ mod tests {
             assert_eq!(manager.current_state.current_tick, 10);
             assert_eq!(
                 manager.current_state.current_iteration,
-                NetworkParams::K_ITERATIONS * 10
+                manager.current_state.k_iterations * 10
             );
             assert_eq!(manager.current_state.accounts.len(), 1);
             assert_eq!(
@@ -1160,7 +1153,7 @@ mod tests {
 
         // Modify state
         state.current_tick = 100;
-        state.current_iteration = NetworkParams::K_ITERATIONS * 100;
+        state.current_iteration = state.k_iterations * 100;
         state.current_phase = TickPhase::Consensus;
         state
             .accounts
@@ -1202,8 +1195,6 @@ mod tests {
             .accounts
             .insert([2u8; 32], create_test_account([2u8; 32], 0));
 
-        assert_eq!(state.total_transactions, 0);
-
         // Apply multiple transactions
         let send = Send {
             sender: [1u8; 32],
@@ -1215,7 +1206,6 @@ mod tests {
             gas_sponsorer: [1u8; 32],
         };
         state.apply_send(&send).unwrap();
-        assert_eq!(state.total_transactions, 1);
 
         let mint = Mint {
             sender: [3u8; 32],
@@ -1226,7 +1216,6 @@ mod tests {
             gas_sponsorer: [3u8; 32],
         };
         state.apply_mint(&mint).unwrap();
-        assert_eq!(state.total_transactions, 2);
 
         // Failed transaction shouldn't increment counter
         let invalid_send = Send {
@@ -1239,6 +1228,5 @@ mod tests {
             gas_sponsorer: [1u8; 32],
         };
         let _ = state.apply_send(&invalid_send);
-        assert_eq!(state.total_transactions, 2); // Still 2
     }
 }
