@@ -1,31 +1,25 @@
 # Kala Rustfmt Configuration
+# Note: Some advanced features require nightly. Run `cargo +nightly fmt` to use all features.
 
-# Use 2021 style edition formatting
-style_edition = "2021"
-
-# Import organization
-reorder_imports = true
-imports_granularity = "Crate"
-group_imports = "StdExternalCrate"
-
-# Line handling
-use_small_heuristics = "Max"
-comment_width = 100
-wrap_comments = true
+# Stable features
+edition = "2021"
 max_width = 100
-
-# Expressions and operators
-binop_separator = "Back"
-trailing_comma = "Vertical"
-trailing_semicolon = false
-
-# Struct and field shorthand
+tab_spaces = 4
+newline_style = "Auto"
+use_small_heuristics = "Default"
+reorder_imports = true
 use_field_init_shorthand = true
 
-# Documentation
-format_code_in_doc_comments = true
-doc_comment_code_block_width = 100
-
-# Formatting control
-format_strings = false
-format_macro_matchers = false
+# Nightly-only features (uncomment when using nightly toolchain)
+# style_edition = "2021"
+# imports_granularity = "Crate"
+# group_imports = "StdExternalCrate"
+# comment_width = 100
+# wrap_comments = true
+# binop_separator = "Back"
+# trailing_comma = "Vertical"
+# trailing_semicolon = false
+# format_code_in_doc_comments = true
+# doc_comment_code_block_width = 100
+# format_strings = false
+# format_macro_matchers = false

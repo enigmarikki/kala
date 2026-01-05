@@ -20,13 +20,13 @@
 [workspace]
 resolver = "2"
 members = [
-    "kala-timelocks/timelocks",      # RSW timelock puzzles for MEV mitigation
-    "kala-common",              # Shared utilities and types
-    "kala-core",                # Main blockchain node and consensus
-    "kala-state",               # State management and accounts
-    "kala-rpc",                 # JSON-RPC API server
-    "kala-transaction",         # Transaction types and processing
-    "kala-tick"                 # CVDF streamer with Pietrzak proofs
+    "crates/kala-common",               # Shared utilities and types
+    "crates/kala-core",                 # Main blockchain node and consensus
+    "crates/kala-rpc",                  # JSON-RPC API server
+    "crates/kala-state",                # State management and accounts
+    "crates/kala-tick",                 # CVDF streamer with Pietrzak proofs
+    "crates/kala-timelocks/timelocks",  # RSW timelock puzzles for MEV mitigation
+    "crates/kala-transaction",          # Transaction types and processing
 ]
 
 # Shared package metadata for all workspace members
@@ -41,15 +41,13 @@ repository = "https://github.com/enigmarikki/kala"
 # This ensures version consistency across all crates and simplifies maintenance
 [workspace.dependencies]
 # Internal crates - VDF and cryptographic components
-# tick = { path = "tick/tick" }                              # DEPRECATED: C++ VDF computation engine
-kala-timelocks = { path = "kala-timelocks/timelocks" }               # RSW timelock puzzles
-kala-common = { path = "kala-common" }                     # Shared utilities and types
-kala-core = { path = "kala-core" }                         # Main blockchain node
-kala-state = { path = "kala-state" }                       # State management
-kala-rpc = { path = "kala-rpc" }                           # JSON-RPC API
-kala-transaction = { path = "kala-transaction" }           # Transaction handling
-# kala-vdf = { path = "kala-vdf" }                           # DEPRECATED: VDF utilities (replaced by kala-tick)
-kala-tick = { path = "kala-tick"}                          # CVDF streamer with Pietrzak proofs
+kala-common = { path = "crates/kala-common" }
+kala-core = { path = "crates/kala-core" }
+kala-rpc = { path = "crates/kala-rpc" }
+kala-state = { path = "crates/kala-state" }
+kala-tick = { path = "crates/kala-tick" }
+kala-timelocks = { path = "crates/kala-timelocks/timelocks" }
+kala-transaction = { path = "crates/kala-transaction" }
 
 # External dependencies - grouped by category
 

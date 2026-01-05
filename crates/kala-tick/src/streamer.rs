@@ -392,10 +392,7 @@ impl CVDFStreamer {
             return Err(KalaError::CVDFError(CVDFError::InvalidElement));
         }
 
-        let mut frontier = self
-            .frontier
-            .write()
-            .map_err(|e| KalaError::CVDFError(e.into()))?;
+        let mut frontier = self.frontier.write().map_err(|e| KalaError::CVDFError(e.into()))?;
         frontier.starting_value = start_form.reduce();
         frontier.current_time = 0;
         frontier.nodes.clear();
@@ -418,11 +415,7 @@ impl CVDFStreamer {
         // For single squaring, we can use a much lighter proof
         let proof = self.generate_single_step_proof(input, &output)?;
 
-        Ok(CVDFStepResult {
-            output,
-            proof,
-            step_count: 1,
-        })
+        Ok(CVDFStepResult { output, proof, step_count: 1 })
     }
 
     /// Compute multiple sequential steps (for k iterations in a tick)
@@ -460,19 +453,12 @@ impl CVDFStreamer {
         // Aggregate the proof chain into a compact proof
         let aggregated_proof = self.aggregate_proof_chain(proof_chain)?;
 
-        Ok(CVDFStepResult {
-            output: current,
-            proof: aggregated_proof,
-            step_count: k,
-        })
+        Ok(CVDFStepResult { output: current, proof: aggregated_proof, step_count: k })
     }
 
     /// Perform aggregation starting from a level
     fn perform_aggregation(&self, start_level: usize) -> KalaResult<()> {
-        let mut frontier = self
-            .frontier
-            .write()
-            .map_err(|e| KalaError::CVDFError(e.into()))?;
+        let mut frontier = self.frontier.write().map_err(|e| KalaError::CVDFError(e.into()))?;
         Self::try_aggregate_internal(&self.class_group, &self.config, &mut frontier, start_level)
     }
 
@@ -538,11 +524,8 @@ impl CVDFStreamer {
             }
 
             // Create parent node (no VDF proof needed for internal nodes)
-            let parent = ProofNode {
-                value: aggregate.reduce(),
-                vdf_proof: None,
-                time: children[0].time,
-            };
+            let parent =
+                ProofNode { value: aggregate.reduce(), vdf_proof: None, time: children[0].time };
 
             // Store parent to add later
             let parent_index = start_index / k;
@@ -567,10 +550,7 @@ impl CVDFStreamer {
 
     /// Generate a verifiable proof for the current computation
     pub fn generate_proof(&self) -> KalaResult<CVDFProof> {
-        let frontier = self
-            .frontier
-            .read()
-            .map_err(|e| KalaError::CVDFError(e.into()))?;
+        let frontier = self.frontier.read().map_err(|e| KalaError::CVDFError(e.into()))?;
         Ok(frontier.generate_proof())
     }
 
@@ -608,11 +588,7 @@ impl CVDFStreamer {
 
         let proof_hash: [u8; 32] = hasher.finalize().into();
 
-        Ok(CVDFStepProof {
-            input: input.clone(),
-            output: output.clone(),
-            proof_data: proof_hash,
-        })
+        Ok(CVDFStepProof { input: input.clone(), output: output.clone(), proof_data: proof_hash })
     }
 
     /// Aggregate a chain of single-step proofs into a compact proof
@@ -662,28 +638,19 @@ impl CVDFStreamer {
 
     /// Get progress
     pub fn get_progress(&self) -> KalaResult<(usize, usize)> {
-        let frontier = self
-            .frontier
-            .read()
-            .map_err(|e| KalaError::CVDFError(e.into()))?;
+        let frontier = self.frontier.read().map_err(|e| KalaError::CVDFError(e.into()))?;
         Ok((frontier.current_time, frontier.nodes.len()))
     }
 
     /// Export/import for handoff
     pub fn export_state(&self) -> KalaResult<Vec<u8>> {
-        let frontier = self
-            .frontier
-            .read()
-            .map_err(|e| KalaError::CVDFError(e.into()))?;
+        let frontier = self.frontier.read().map_err(|e| KalaError::CVDFError(e.into()))?;
         frontier.checkpoint()
     }
 
     pub fn import_state(&mut self, data: &[u8]) -> KalaResult<()> {
         let imported = CVDFFrontier::from_checkpoint(data)?;
-        let mut frontier = self
-            .frontier
-            .write()
-            .map_err(|e| KalaError::CVDFError(e.into()))?;
+        let mut frontier = self.frontier.write().map_err(|e| KalaError::CVDFError(e.into()))?;
         *frontier = imported;
         Ok(())
     }
@@ -713,9 +680,8 @@ mod tests {
         let starting_form = QuadraticForm::identity(&config.discriminant);
 
         // Test single step computation
-        let result = streamer
-            .compute_single_step(&starting_form)
-            .expect("Single step should succeed");
+        let result =
+            streamer.compute_single_step(&starting_form).expect("Single step should succeed");
 
         assert_eq!(result.step_count, 1);
         // For identity form, squaring should still be identity (that's mathematically correct)
@@ -724,9 +690,8 @@ mod tests {
         assert!(!result.proof.proof_data.is_empty());
 
         // Verify that the output is actually the square of the input
-        let expected_output = class_group
-            .square(&starting_form)
-            .expect("Manual squaring should work");
+        let expected_output =
+            class_group.square(&starting_form).expect("Manual squaring should work");
         assert_eq!(result.output, expected_output);
 
         // For identity, output should equal input (identity^2 = identity)
@@ -749,9 +714,7 @@ mod tests {
         let k = 5;
 
         // Test k-step computation
-        let result = streamer
-            .compute_k_steps(&starting_form, k)
-            .expect("K steps should succeed");
+        let result = streamer.compute_k_steps(&starting_form, k).expect("K steps should succeed");
 
         assert_eq!(result.step_count, k);
         assert_eq!(result.proof.input, starting_form);
@@ -761,15 +724,11 @@ mod tests {
         let mut manual_result = starting_form.clone();
 
         for _ in 0..k {
-            manual_result = class_group
-                .square(&manual_result)
-                .expect("Manual squaring should succeed");
+            manual_result =
+                class_group.square(&manual_result).expect("Manual squaring should succeed");
         }
 
-        assert_eq!(
-            result.output, manual_result,
-            "K-step result should match manual computation"
-        );
+        assert_eq!(result.output, manual_result, "K-step result should match manual computation");
     }
 
     #[test]
@@ -870,15 +829,11 @@ mod tests {
 
         let mut streamer = CVDFStreamer::new(config.clone());
         let starting_form = QuadraticForm::identity(&config.discriminant);
-        streamer
-            .initialize(starting_form)
-            .expect("Initialization should work");
+        streamer.initialize(starting_form).expect("Initialization should work");
 
         // Test legacy stream_computation method
         let steps = 3;
-        let result = streamer
-            .stream_computation(steps)
-            .expect("Legacy method should work");
+        let result = streamer.stream_computation(steps).expect("Legacy method should work");
 
         assert_eq!(result.len(), 1); // Should return single result now
         assert_eq!(result[0].time, steps);
@@ -888,11 +843,7 @@ mod tests {
 
     #[test]
     fn test_proof_generation_and_verification() {
-        let config = CVDFConfig {
-            tree_arity: 2,
-            base_difficulty: 2,
-            ..CVDFConfig::default()
-        };
+        let config = CVDFConfig { tree_arity: 2, base_difficulty: 2, ..CVDFConfig::default() };
 
         let mut streamer = CVDFStreamer::new(config.clone());
         let starting = QuadraticForm::identity(&config.discriminant);
@@ -928,11 +879,7 @@ mod tests {
 
     #[test]
     fn test_aggregation_verification() {
-        let config = CVDFConfig {
-            tree_arity: 4,
-            base_difficulty: 2,
-            ..CVDFConfig::default()
-        };
+        let config = CVDFConfig { tree_arity: 4, base_difficulty: 2, ..CVDFConfig::default() };
 
         let mut streamer = CVDFStreamer::new(config.clone());
         let starting = QuadraticForm::identity(&config.discriminant);

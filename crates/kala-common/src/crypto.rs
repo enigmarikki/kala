@@ -123,10 +123,7 @@ impl MerkleTree {
     /// Build merkle tree from leaf hashes
     pub fn new(leaves: Vec<Hash>) -> Self {
         if leaves.is_empty() {
-            return Self {
-                leaves: vec![HashExt::zero()],
-                nodes: vec![HashExt::zero()],
-            };
+            return Self { leaves: vec![HashExt::zero()], nodes: vec![HashExt::zero()] };
         }
 
         let mut nodes = leaves.clone();
@@ -172,11 +169,8 @@ impl MerkleTree {
         let mut level_start = 0;
 
         while level_size > 1 {
-            let sibling_index = if current_index % 2 == 0 {
-                current_index + 1
-            } else {
-                current_index - 1
-            };
+            let sibling_index =
+                if current_index % 2 == 0 { current_index + 1 } else { current_index - 1 };
 
             if sibling_index < level_size {
                 proof.push(self.nodes[level_start + sibling_index]);

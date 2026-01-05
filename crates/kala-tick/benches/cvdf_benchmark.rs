@@ -97,9 +97,7 @@ fn bench_proof_aggregation(c: &mut Criterion) {
 
                 for _ in 0..chain_length {
                     let next = class_group.square(&current).unwrap();
-                    let proof = streamer
-                        .generate_single_step_proof(&current, &next)
-                        .unwrap();
+                    let proof = streamer.generate_single_step_proof(&current, &next).unwrap();
                     proof_chain.push(proof);
                     current = next;
                 }
@@ -132,13 +130,9 @@ fn bench_class_group_operations(c: &mut Criterion) {
 
     // Benchmark repeated squaring with different exponents
     for exp in [8, 16, 32].iter() {
-        group.bench_with_input(
-            BenchmarkId::new("repeated_squaring", exp),
-            exp,
-            |b, &exp| {
-                b.iter(|| class_group.repeated_squaring(black_box(&form), black_box(exp)));
-            },
-        );
+        group.bench_with_input(BenchmarkId::new("repeated_squaring", exp), exp, |b, &exp| {
+            b.iter(|| class_group.repeated_squaring(black_box(&form), black_box(exp)));
+        });
     }
 
     group.finish();

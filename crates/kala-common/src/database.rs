@@ -149,10 +149,9 @@ impl DatabaseOps for KalaDatabase {
         let prefix_with_separator = format!("{}:", prefix);
         let prefix_bytes = prefix_with_separator.as_bytes();
 
-        let iter = self.db.iterator(rocksdb::IteratorMode::From(
-            prefix_bytes,
-            rocksdb::Direction::Forward,
-        ));
+        let iter = self
+            .db
+            .iterator(rocksdb::IteratorMode::From(prefix_bytes, rocksdb::Direction::Forward));
 
         for item in iter {
             let (key, _) = item.map_err(KalaError::from)?;
@@ -285,11 +284,7 @@ impl DatabaseUtils {
     pub fn restore_database(backup_path: &str, restore_path: &str) -> KalaResult<()> {
         // This would require additional rocksdb backup functionality
         // For now, just return success
-        tracing::info!(
-            "Database restore requested from: {} to: {}",
-            backup_path,
-            restore_path
-        );
+        tracing::info!("Database restore requested from: {} to: {}", backup_path, restore_path);
         Ok(())
     }
 }
@@ -312,10 +307,7 @@ mod tests {
         let db_path = temp_dir.path().join("test_db");
         let db = KalaDatabase::new(db_path.to_str().unwrap()).unwrap();
 
-        let test_data = TestData {
-            id: 123,
-            name: "test".to_string(),
-        };
+        let test_data = TestData { id: 123, name: "test".to_string() };
 
         // Test store typed
         db.store_typed("test", "key1", &test_data).await.unwrap();
@@ -369,30 +361,9 @@ mod tests {
         let db = KalaDatabase::new(db_path.to_str().unwrap()).unwrap();
 
         let operations = vec![
-            (
-                "test".to_string(),
-                "key1".to_string(),
-                TestData {
-                    id: 1,
-                    name: "one".to_string(),
-                },
-            ),
-            (
-                "test".to_string(),
-                "key2".to_string(),
-                TestData {
-                    id: 2,
-                    name: "two".to_string(),
-                },
-            ),
-            (
-                "test".to_string(),
-                "key3".to_string(),
-                TestData {
-                    id: 3,
-                    name: "three".to_string(),
-                },
-            ),
+            ("test".to_string(), "key1".to_string(), TestData { id: 1, name: "one".to_string() }),
+            ("test".to_string(), "key2".to_string(), TestData { id: 2, name: "two".to_string() }),
+            ("test".to_string(), "key3".to_string(), TestData { id: 3, name: "three".to_string() }),
         ];
 
         db.batch_store_typed(operations).await.unwrap();
@@ -412,10 +383,7 @@ mod tests {
         let db_path = temp_dir.path().join("prefix_test_db");
         let db = KalaDatabase::new(db_path.to_str().unwrap()).unwrap();
 
-        let test_data = TestData {
-            id: 1,
-            name: "test".to_string(),
-        };
+        let test_data = TestData { id: 1, name: "test".to_string() };
 
         // Store data with different prefixes
         db.store_typed("prefix1", "key1", &test_data).await.unwrap();

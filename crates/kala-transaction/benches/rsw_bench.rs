@@ -489,29 +489,25 @@ fn bench_memory_usage(c: &mut Criterion) {
     let batch_sizes = [10, 50, 100, 500];
 
     for size in batch_sizes {
-        group.bench_with_input(
-            BenchmarkId::new("batch_memory", size),
-            &size,
-            |b, &batch_size| {
-                b.iter(|| {
-                    let transactions = create_test_transactions(batch_size);
-                    let mut total_size = 0;
+        group.bench_with_input(BenchmarkId::new("batch_memory", size), &size, |b, &batch_size| {
+            b.iter(|| {
+                let transactions = create_test_transactions(batch_size);
+                let mut total_size = 0;
 
-                    for (i, tx) in transactions.iter().enumerate() {
-                        let timelock_tx =
-                            create_timelock_transaction(tx, &ctx, 500 + i as u64).unwrap();
+                for (i, tx) in transactions.iter().enumerate() {
+                    let timelock_tx =
+                        create_timelock_transaction(tx, &ctx, 500 + i as u64).unwrap();
 
-                        total_size += std::mem::size_of_val(&timelock_tx)
-                            + timelock_tx.encrypted_data.ciphertext.len()
-                            + timelock_tx.puzzle.n.len()
-                            + timelock_tx.puzzle.a.len()
-                            + timelock_tx.puzzle.puzzle_value.len();
-                    }
+                    total_size += std::mem::size_of_val(&timelock_tx)
+                        + timelock_tx.encrypted_data.ciphertext.len()
+                        + timelock_tx.puzzle.n.len()
+                        + timelock_tx.puzzle.a.len()
+                        + timelock_tx.puzzle.puzzle_value.len();
+                }
 
-                    total_size
-                })
-            },
-        );
+                total_size
+            })
+        });
     }
 
     group.finish();

@@ -421,10 +421,7 @@ mod tests {
 
     #[test]
     fn test_compose_identity() {
-        let disc = Discriminant {
-            value: Integer::from(-23),
-            bit_length: 6,
-        };
+        let disc = Discriminant { value: Integer::from(-23), bit_length: 6 };
         let cg = ClassGroup::new(disc.clone());
         let identity = QuadraticForm::identity(&disc);
         let form = QuadraticForm::new(Integer::from(2), Integer::from(1), Integer::from(3));
@@ -436,34 +433,23 @@ mod tests {
 
     #[test]
     fn test_square() {
-        let disc = Discriminant {
-            value: Integer::from(-23),
-            bit_length: 6,
-        };
+        let disc = Discriminant { value: Integer::from(-23), bit_length: 6 };
         let cg = ClassGroup::new(disc.clone());
         let form = QuadraticForm::new(Integer::from(2), Integer::from(1), Integer::from(3));
         let form = form.reduce();
         let squared = cg.square(&form).expect("Square should succeed");
         let composed = cg.compose(&form, &form).expect("Compose should succeed");
-        assert_eq!(
-            squared.reduce(),
-            composed.reduce(),
-            "Reduced forms should match"
-        );
+        assert_eq!(squared.reduce(), composed.reduce(), "Reduced forms should match");
         assert_eq!(squared.discriminant(), disc.value);
     }
 
     #[test]
     fn test_repeated_squaring() {
-        let disc = Discriminant {
-            value: Integer::from(-23),
-            bit_length: 6,
-        };
+        let disc = Discriminant { value: Integer::from(-23), bit_length: 6 };
         let cg = ClassGroup::new(disc.clone());
         let form = QuadraticForm::new(Integer::from(2), Integer::from(1), Integer::from(3));
-        let form_4_method1 = cg
-            .repeated_squaring(&form, 2)
-            .expect("Repeated squaring should succeed");
+        let form_4_method1 =
+            cg.repeated_squaring(&form, 2).expect("Repeated squaring should succeed");
         let form_2 = cg.square(&form).expect("Square should succeed");
         let form_4_method2 = cg.square(&form_2).expect("Square should succeed");
         assert_eq!(form_4_method1.discriminant(), form_4_method2.discriminant());
@@ -472,32 +458,20 @@ mod tests {
 
     #[test]
     fn test_pow() {
-        let disc = Discriminant {
-            value: Integer::from(-23),
-            bit_length: 6,
-        };
+        let disc = Discriminant { value: Integer::from(-23), bit_length: 6 };
         let cg = ClassGroup::new(disc.clone());
         let form = QuadraticForm::new(Integer::from(2), Integer::from(1), Integer::from(3));
-        let result = cg
-            .pow(&form, &Integer::from(0))
-            .expect("Power should succeed");
+        let result = cg.pow(&form, &Integer::from(0)).expect("Power should succeed");
         assert_eq!(result, QuadraticForm::identity(&disc));
-        let result = cg
-            .pow(&form, &Integer::from(1))
-            .expect("Power should succeed");
+        let result = cg.pow(&form, &Integer::from(1)).expect("Power should succeed");
         assert_eq!(result, form.reduce());
-        let result = cg
-            .pow(&form, &Integer::from(4))
-            .expect("Power should succeed");
+        let result = cg.pow(&form, &Integer::from(4)).expect("Power should succeed");
         assert_eq!(result.discriminant(), disc.value);
     }
 
     #[test]
     fn test_random_element() {
-        let disc = Discriminant {
-            value: Integer::from(-23),
-            bit_length: 6,
-        };
+        let disc = Discriminant { value: Integer::from(-23), bit_length: 6 };
         let cg = ClassGroup::new(disc.clone());
         let form = cg.random_element().expect("Random element should succeed");
         assert_eq!(form.discriminant(), disc.value);
@@ -506,10 +480,7 @@ mod tests {
 
     #[test]
     fn test_associativity() {
-        let disc = Discriminant {
-            value: Integer::from(-23),
-            bit_length: 6,
-        };
+        let disc = Discriminant { value: Integer::from(-23), bit_length: 6 };
         let cg = ClassGroup::new(disc);
         let f1 = QuadraticForm::new(Integer::from(2), Integer::from(1), Integer::from(3));
         let f2 = QuadraticForm::new(Integer::from(3), Integer::from(1), Integer::from(2));
@@ -526,10 +497,7 @@ mod tests {
     #[test]
     fn test_compose_chia_prod_discriminant() {
         let disc_value = Integer::from_str_radix("-3fe0000000000000000f", 16).unwrap();
-        let disc = Discriminant {
-            value: disc_value.clone(),
-            bit_length: 67,
-        };
+        let disc = Discriminant { value: disc_value.clone(), bit_length: 67 };
         let cg = ClassGroup::new(disc.clone());
         let f1 = QuadraticForm::identity(&disc);
         let f2 = cg.random_element().expect("Random element should succeed");

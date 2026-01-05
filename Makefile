@@ -29,11 +29,14 @@ bench: ## Run benchmarks
 
 ##@ Code Quality
 
-fmt: ## Format code using rustfmt (requires nightly)
+fmt: ## Format code using rustfmt
+	cargo fmt --all
+
+fmt-nightly: ## Format code using nightly rustfmt (more features)
 	cargo +nightly fmt --all
 
 fmt-check: ## Check code formatting without changes
-	cargo +nightly fmt --all -- --check
+	cargo fmt --all -- --check
 
 clippy: ## Run clippy lints
 	cargo clippy --workspace --all-features --all-targets -- -D warnings

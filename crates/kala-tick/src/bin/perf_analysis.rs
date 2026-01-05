@@ -46,16 +46,8 @@ fn analyze_discriminant_impact() {
 
         println!("Discriminant {} bits:", disc_bits);
         println!("  Single step: {:?}", single_time);
-        println!(
-            "  {} steps: {:?} (avg: {:?}/step)",
-            k_steps,
-            k_time,
-            k_time / k_steps as u32
-        );
-        println!(
-            "  Throughput: {:.2} steps/sec",
-            k_steps as f64 / k_time.as_secs_f64()
-        );
+        println!("  {} steps: {:?} (avg: {:?}/step)", k_steps, k_time, k_time / k_steps as u32);
+        println!("  Throughput: {:.2} steps/sec", k_steps as f64 / k_time.as_secs_f64());
     }
 }
 
@@ -87,10 +79,7 @@ fn analyze_k_steps_scaling() {
             let avg_per_step = elapsed.as_micros() as f64 / k as f64;
             let throughput = k as f64 / elapsed.as_secs_f64();
 
-            println!(
-                "{:5} | {:10.3?} | {:8.1}μs | {:8.1}/s",
-                k, elapsed, avg_per_step, throughput
-            );
+            println!("{:5} | {:10.3?} | {:8.1}μs | {:8.1}/s", k, elapsed, avg_per_step, throughput);
         } else {
             println!("{:5} | ERROR", k);
         }
@@ -152,9 +141,7 @@ fn analyze_proof_overhead() {
         // Build chain
         for _ in 0..size {
             let next = class_group.square(&current).unwrap();
-            let proof = streamer
-                .generate_single_step_proof(&current, &next)
-                .unwrap();
+            let proof = streamer.generate_single_step_proof(&current, &next).unwrap();
             proof_chain.push(proof);
             current = next;
         }

@@ -23,10 +23,7 @@ fn main() {
         let status = Command::new("make")
             .current_dir(&timelocks_root)
             .arg("lib")
-            .arg(format!(
-                "SM={}",
-                env::var("CUDA_SM").unwrap_or_else(|_| "75".to_string())
-            ))
+            .arg(format!("SM={}", env::var("CUDA_SM").unwrap_or_else(|_| "75".to_string())))
             .status()
             .expect("Failed to run make");
 

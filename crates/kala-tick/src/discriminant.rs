@@ -56,10 +56,7 @@ impl Discriminant {
             }
         }
 
-        Ok(Discriminant {
-            value: d,
-            bit_length: bits,
-        })
+        Ok(Discriminant { value: d, bit_length: bits })
     }
 
     /// Create from a specific value (for testing or known discriminants)

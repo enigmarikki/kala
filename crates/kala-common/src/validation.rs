@@ -47,9 +47,7 @@ impl ValidationUtils {
         pubkey.copy_from_slice(&bytes);
 
         if !CryptoUtils::validate_pubkey(&pubkey) {
-            return Err(KalaError::validation(
-                "Invalid public key: zero or invalid format",
-            ));
+            return Err(KalaError::validation("Invalid public key: zero or invalid format"));
         }
 
         Ok(pubkey)
@@ -65,9 +63,7 @@ impl ValidationUtils {
         signature.copy_from_slice(&bytes);
 
         if !CryptoUtils::validate_signature(&signature) {
-            return Err(KalaError::validation(
-                "Invalid signature: zero or invalid format",
-            ));
+            return Err(KalaError::validation("Invalid signature: zero or invalid format"));
         }
 
         Ok(signature)
@@ -184,10 +180,7 @@ impl ValidationUtils {
             Self::validate_hex_string(&address[2..], address.len() / 2 - 1)?;
         } else {
             // Assume base58 - basic character validation
-            if !address
-                .chars()
-                .all(|c| c.is_ascii_alphanumeric() && !"0OIl".contains(c))
-            {
+            if !address.chars().all(|c| c.is_ascii_alphanumeric() && !"0OIl".contains(c)) {
                 return Err(KalaError::validation("Invalid address format"));
             }
         }

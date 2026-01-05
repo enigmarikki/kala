@@ -1,13 +1,9 @@
-[![crates.io](https://img.shields.io/crates/v/kala-core.svg)](https://crates.io/crates/kala-core)
-[![docs.rs](https://docs.rs/kala-core/badge.svg)](https://docs.rs/kala-core)
-[![Build Status](https://github.com/enigmarikki/kala/actions/workflows/ci.yml/badge.svg?branch=master)](https://github.com/enigmarikki/kala/actions?query=workflow%3Aci)
-[![codecov](https://codecov.io/gh/enigmarikki/kala/branch/master/graph/badge.svg)](https://codecov.io/gh/enigmarikki/kala)
-
 # Kala: The Immutability of Time
 
-**Version:** v0.0.2
+> **WIP** - This project is under active development. APIs and architecture may change.
+
+**Version:** v0.0.3
 **Author:** Hrishi
-**Date:** July 24, 2025
 
 ---
 
@@ -26,7 +22,7 @@ Kala is a high-performance, VDF-based blockchain architecture designed for trust
 * MEV-resistant transaction ordering via timelock encryption
 * Graceful degradation under partial consensus failures
 
-For full technical details, see the [project whitepaper](https://github.com/enigmarikki/kala/blob/master/docs/kala_v0.0.2.pdf).
+For full technical details, see the [project whitepaper](https://github.com/enigmarikki/kala/blob/master/docs/kala_v0.0.3.pdf).
 
 ---
 
@@ -439,10 +435,40 @@ Kala is an open-source research project. Contributions are welcome!
 ### Development Setup
 
 1. Fork the repository
-2. Set up development environment: `docker compose up --build`
-3. Make your changes
-4. Run tests: `docker compose exec kala cargo test`
-5. Submit a pull request
+2. Install dev tools: `make install-tools`
+3. Install git hooks: `make install-hooks`
+4. Make your changes
+5. Run checks: `make pr`
+6. Submit a pull request
+
+### Development Commands
+
+```bash
+make build       # Build all crates
+make test        # Run tests
+make fmt         # Format code
+make clippy      # Run lints
+make lint        # Format + clippy
+make pr          # Full PR checks (lint, test, deny)
+make help        # Show all commands
+```
+
+### Project Structure
+
+```
+kala/
+├── crates/
+│   ├── kala-common/      # Shared types and utilities
+│   ├── kala-core/        # Node and consensus logic
+│   ├── kala-rpc/         # JSON-RPC API
+│   ├── kala-state/       # State management
+│   ├── kala-tick/        # CVDF streamer (Pietrzak proofs)
+│   ├── kala-timelocks/   # RSW timelock puzzles (CUDA)
+│   └── kala-transaction/ # Transaction types
+├── scripts/              # Development scripts
+├── docs/                 # Whitepaper and documentation
+└── Makefile              # Development workflow
+```
 
 ### Research Areas
 

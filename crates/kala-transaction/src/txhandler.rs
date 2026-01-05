@@ -7,6 +7,7 @@ use aes_gcm::{
     Aes256Gcm, Key, Nonce,
 };
 use kala_common::prelude::{KalaError, KalaResult};
+use kala_common::types::IterationNumber;
 use rand::Rng;
 use rug::{rand::RandState, Integer};
 use std::sync::{
@@ -73,15 +74,10 @@ pub fn encrypt_transaction(
 
     // Extract tag from the end of ciphertext (last 16 bytes)
     let (encrypted_data, tag_bytes) = ciphertext.split_at(ciphertext.len() - TAG_SIZE);
-    let tag: Tag128 = tag_bytes
-        .try_into()
-        .map_err(|_| KalaError::crypto("Invalid tag size".to_string()))?;
+    let tag: Tag128 =
+        tag_bytes.try_into().map_err(|_| KalaError::crypto("Invalid tag size".to_string()))?;
 
-    Ok(SealedTransaction {
-        nonce: nonce_array,
-        tag,
-        ciphertext: encrypted_data.to_vec(),
-    })
+    Ok(SealedTransaction { nonce: nonce_array, tag, ciphertext: encrypted_data.to_vec() })
 }
 
 /// Decrypts a sealed transaction using AES-256-GCM
@@ -122,10 +118,7 @@ impl RSWTimelock {
             .or_else(|_| Solver::new(0))
             .map_err(|e| KalaError::crypto(format!("Failed to create RSW solver: {e}")))?;
 
-        Ok(Self {
-            solver,
-            modulus_bits,
-        })
+        Ok(Self { solver, modulus_bits })
     }
 
     /// Generate RSW puzzle parameters
@@ -181,12 +174,7 @@ impl RSWTimelock {
         let a_bytes = a.to_digits::<u8>(Order::Msf);
         let puzzle_bytes = puzzle_value.to_digits::<u8>(Order::Msf);
 
-        Ok(RSWPuzzle {
-            puzzle_value: puzzle_bytes,
-            a: a_bytes,
-            n: n_bytes,
-            hardness,
-        })
+        Ok(RSWPuzzle { puzzle_value: puzzle_bytes, a: a_bytes, n: n_bytes, hardness })
     }
 
     /// Solve RSW puzzle to recover key using GPU acceleration
@@ -210,12 +198,7 @@ impl RSWTimelock {
         let puzzle_inputs: Vec<(String, String, String, u32)> = puzzles
             .iter()
             .map(|p| {
-                (
-                    hex::encode(&p.n),
-                    hex::encode(&p.a),
-                    hex::encode(&p.puzzle_value),
-                    p.hardness,
-                )
+                (hex::encode(&p.n), hex::encode(&p.a), hex::encode(&p.puzzle_value), p.hardness)
             })
             .collect();
 
@@ -242,13 +225,13 @@ impl RSWTimelock {
 pub fn create_timelock_transaction(
     tx: &Transaction,
     ctx: &EncryptionContext,
-    current_iteration: u64,
+    current_iteration: IterationNumber,
 ) -> KalaResult<TimelockTransaction> {
     let current_tick = ctx.current_tick();
     let hardness = ctx.current_hardness();
     // Generate encryption key
     let mut key = [0u8; AES_KEY_SIZE];
-    rand::thread_rng().fill(&mut key);
+    rand::rng().fill(&mut key);
 
     // Encrypt transaction
     let encrypted_data = encrypt_transaction(tx, &key)?;
@@ -268,7 +251,7 @@ pub fn create_timelock_transaction(
         encrypted_data,
         puzzle,
         submission_iteration: current_iteration,
-        target_tick: current_tick,
+        target_tick: current_tick as u128,
     })
 }
 
@@ -585,11 +568,7 @@ mod tests {
 
         for size in sizes {
             let result = RSWTimelock::new(size);
-            assert!(
-                result.is_ok(),
-                "Failed to create RSWTimelock with {} bits",
-                size
-            );
+            assert!(result.is_ok(), "Failed to create RSWTimelock with {} bits", size);
 
             let timelock = result.unwrap();
             assert_eq!(timelock.modulus_bits, size);
@@ -825,10 +804,7 @@ mod tests {
         }
         let duration = start.elapsed();
 
-        println!(
-            "Generated and solved {} puzzles in {:?}",
-            iterations, duration
-        );
+        println!("Generated and solved {} puzzles in {:?}", iterations, duration);
         println!("Average time per puzzle: {:?}", duration / iterations);
     }
 

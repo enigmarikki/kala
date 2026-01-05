@@ -36,7 +36,7 @@ run_check() {
 
 # 1. Check formatting (without modifying files)
 echo -e "${YELLOW}[fmt]${NC} Checking code formatting..."
-if cargo +nightly fmt --all -- --check > /dev/null 2>&1; then
+if cargo fmt --all -- --check > /dev/null 2>&1; then
     echo -e "${GREEN}[fmt]${NC} Passed\n"
 else
     echo -e "${RED}[fmt]${NC} Failed - run 'make fmt' to fix\n"

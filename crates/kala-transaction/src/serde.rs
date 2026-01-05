@@ -142,13 +142,8 @@ pub fn transaction_to_flatbuffer(tx: &Transaction) -> KalaResult<Vec<u8>> {
         }
     };
 
-    let root = TransactionFb::create(
-        &mut fbb,
-        &TransactionArgs {
-            body_type,
-            body: Some(body_val),
-        },
-    );
+    let root =
+        TransactionFb::create(&mut fbb, &TransactionArgs { body_type, body: Some(body_val) });
 
     fbb.finish(root, None);
     Ok(fbb.finished_data().to_vec())
@@ -174,178 +169,174 @@ pub fn flatbuffer_to_transaction(bytes: &[u8]) -> KalaResult<Transaction> {
     let tx = tx::root_as_transaction(bytes)
         .map_err(|e| KalaError::validation(format!("Failed to parse: {e}")))?;
 
-    let transaction =
-        match tx.body_type() {
-            TxBody::SendTx => {
-                let st = tx
-                    .body_as_send_tx()
-                    .ok_or_else(|| KalaError::validation("Invalid SendTx".to_string()))?;
+    let transaction = match tx.body_type() {
+        TxBody::SendTx => {
+            let st = tx
+                .body_as_send_tx()
+                .ok_or_else(|| KalaError::validation("Invalid SendTx".to_string()))?;
 
-                Transaction::Send(Send {
-                    sender: vec_to_array::<32>(
-                        st.sender()
-                            .ok_or_else(|| KalaError::validation("Missing sender".to_string()))?,
-                    )?,
-                    receiver: vec_to_array::<32>(
-                        st.receiver()
-                            .ok_or_else(|| KalaError::validation("Missing receiver".to_string()))?,
-                    )?,
-                    denom: vec_to_array::<32>(
-                        st.denom()
-                            .ok_or_else(|| KalaError::validation("Missing denom".to_string()))?,
-                    )?,
-                    amount: st.amount(),
-                    nonce: st.nonce(),
-                    signature: vec_to_array(
-                        st.signature().ok_or_else(|| {
-                            KalaError::validation("Missing signature".to_string())
-                        })?,
-                    )?,
-                    gas_sponsorer: vec_to_array::<32>(st.gas_sponsorer().ok_or_else(|| {
+            Transaction::Send(Send {
+                sender: vec_to_array::<32>(
+                    st.sender()
+                        .ok_or_else(|| KalaError::validation("Missing sender".to_string()))?,
+                )?,
+                receiver: vec_to_array::<32>(
+                    st.receiver()
+                        .ok_or_else(|| KalaError::validation("Missing receiver".to_string()))?,
+                )?,
+                denom: vec_to_array::<32>(
+                    st.denom().ok_or_else(|| KalaError::validation("Missing denom".to_string()))?,
+                )?,
+                amount: st.amount(),
+                nonce: st.nonce(),
+                signature: vec_to_array(
+                    st.signature()
+                        .ok_or_else(|| KalaError::validation("Missing signature".to_string()))?,
+                )?,
+                gas_sponsorer: vec_to_array::<32>(
+                    st.gas_sponsorer().ok_or_else(|| {
                         KalaError::validation("Missing gas_sponsorer".to_string())
-                    })?)?,
-                })
-            }
-            TxBody::MintTx => {
-                let mt = tx
-                    .body_as_mint_tx()
-                    .ok_or_else(|| KalaError::validation("Invalid MintTx".to_string()))?;
+                    })?,
+                )?,
+            })
+        }
+        TxBody::MintTx => {
+            let mt = tx
+                .body_as_mint_tx()
+                .ok_or_else(|| KalaError::validation("Invalid MintTx".to_string()))?;
 
-                Transaction::Mint(Mint {
-                    sender: vec_to_array::<32>(
-                        mt.sender()
-                            .ok_or_else(|| KalaError::validation("Missing sender".to_string()))?,
-                    )?,
-                    amount: mt.amount(),
-                    denom: vec_to_array::<32>(
-                        mt.denom()
-                            .ok_or_else(|| KalaError::validation("Missing denom".to_string()))?,
-                    )?,
-                    nonce: mt.nonce(),
-                    signature: vec_to_array::<64>(
-                        mt.signature().ok_or_else(|| {
-                            KalaError::validation("Missing signature".to_string())
-                        })?,
-                    )?,
-                    gas_sponsorer: vec_to_array::<32>(mt.gas_sponsorer().ok_or_else(|| {
+            Transaction::Mint(Mint {
+                sender: vec_to_array::<32>(
+                    mt.sender()
+                        .ok_or_else(|| KalaError::validation("Missing sender".to_string()))?,
+                )?,
+                amount: mt.amount(),
+                denom: vec_to_array::<32>(
+                    mt.denom().ok_or_else(|| KalaError::validation("Missing denom".to_string()))?,
+                )?,
+                nonce: mt.nonce(),
+                signature: vec_to_array::<64>(
+                    mt.signature()
+                        .ok_or_else(|| KalaError::validation("Missing signature".to_string()))?,
+                )?,
+                gas_sponsorer: vec_to_array::<32>(
+                    mt.gas_sponsorer().ok_or_else(|| {
                         KalaError::validation("Missing gas_sponsorer".to_string())
-                    })?)?,
-                })
-            }
-            TxBody::BurnTx => {
-                let mt = tx
-                    .body_as_burn_tx()
-                    .ok_or_else(|| KalaError::validation("Invalid BurnTx".to_string()))?;
+                    })?,
+                )?,
+            })
+        }
+        TxBody::BurnTx => {
+            let mt = tx
+                .body_as_burn_tx()
+                .ok_or_else(|| KalaError::validation("Invalid BurnTx".to_string()))?;
 
-                Transaction::Burn(Burn {
-                    sender: vec_to_array::<32>(
-                        mt.sender()
-                            .ok_or_else(|| KalaError::validation("Missing sender".to_string()))?,
-                    )?,
-                    amount: mt.amount(),
-                    denom: vec_to_array::<32>(
-                        mt.denom()
-                            .ok_or_else(|| KalaError::validation("Missing denom".to_string()))?,
-                    )?,
-                    nonce: mt.nonce(),
-                    signature: vec_to_array(
-                        mt.signature().ok_or_else(|| {
-                            KalaError::validation("Missing signature".to_string())
-                        })?,
-                    )?,
-                    gas_sponsorer: vec_to_array::<32>(mt.gas_sponsorer().ok_or_else(|| {
+            Transaction::Burn(Burn {
+                sender: vec_to_array::<32>(
+                    mt.sender()
+                        .ok_or_else(|| KalaError::validation("Missing sender".to_string()))?,
+                )?,
+                amount: mt.amount(),
+                denom: vec_to_array::<32>(
+                    mt.denom().ok_or_else(|| KalaError::validation("Missing denom".to_string()))?,
+                )?,
+                nonce: mt.nonce(),
+                signature: vec_to_array(
+                    mt.signature()
+                        .ok_or_else(|| KalaError::validation("Missing signature".to_string()))?,
+                )?,
+                gas_sponsorer: vec_to_array::<32>(
+                    mt.gas_sponsorer().ok_or_else(|| {
                         KalaError::validation("Missing gas_sponsorer".to_string())
-                    })?)?,
-                })
-            }
-            TxBody::StakeTx => {
-                let st = tx
-                    .body_as_stake_tx()
-                    .ok_or_else(|| KalaError::validation("Invalid StakeTx".to_string()))?;
+                    })?,
+                )?,
+            })
+        }
+        TxBody::StakeTx => {
+            let st = tx
+                .body_as_stake_tx()
+                .ok_or_else(|| KalaError::validation("Invalid StakeTx".to_string()))?;
 
-                Transaction::Stake(Stake {
-                    delegator: vec_to_array::<32>(
-                        st.delegator()
-                            .ok_or_else(|| KalaError::validation("Missing sender".to_string()))?,
-                    )?,
-                    witness: vec_to_array::<32>(
-                        st.witness()
-                            .ok_or_else(|| KalaError::validation("Missing witness".to_string()))?,
-                    )?,
-                    amount: st.amount(),
-                    nonce: st.nonce(),
-                    signature: vec_to_array(
-                        st.signature().ok_or_else(|| {
-                            KalaError::validation("Missing signature".to_string())
-                        })?,
-                    )?,
-                    gas_sponsorer: vec_to_array::<32>(st.gas_sponsorer().ok_or_else(|| {
+            Transaction::Stake(Stake {
+                delegator: vec_to_array::<32>(
+                    st.delegator()
+                        .ok_or_else(|| KalaError::validation("Missing sender".to_string()))?,
+                )?,
+                witness: vec_to_array::<32>(
+                    st.witness()
+                        .ok_or_else(|| KalaError::validation("Missing witness".to_string()))?,
+                )?,
+                amount: st.amount(),
+                nonce: st.nonce(),
+                signature: vec_to_array(
+                    st.signature()
+                        .ok_or_else(|| KalaError::validation("Missing signature".to_string()))?,
+                )?,
+                gas_sponsorer: vec_to_array::<32>(
+                    st.gas_sponsorer().ok_or_else(|| {
                         KalaError::validation("Missing gas_sponsorer".to_string())
-                    })?)?,
-                })
-            }
-            TxBody::UnstakeTx => {
-                let st = tx
-                    .body_as_unstake_tx()
-                    .ok_or_else(|| KalaError::validation("Invalid UnstakeTx".to_string()))?;
+                    })?,
+                )?,
+            })
+        }
+        TxBody::UnstakeTx => {
+            let st = tx
+                .body_as_unstake_tx()
+                .ok_or_else(|| KalaError::validation("Invalid UnstakeTx".to_string()))?;
 
-                Transaction::Unstake(Unstake {
-                    delegator: vec_to_array::<32>(
-                        st.delegator()
-                            .ok_or_else(|| KalaError::validation("Missing sender".to_string()))?,
-                    )?,
-                    witness: vec_to_array::<32>(
-                        st.witness()
-                            .ok_or_else(|| KalaError::validation("Missing witness".to_string()))?,
-                    )?,
-                    amount: st.amount(),
-                    nonce: st.nonce(),
-                    signature: vec_to_array(
-                        st.signature().ok_or_else(|| {
-                            KalaError::validation("Missing signature".to_string())
-                        })?,
-                    )?,
-                    gas_sponsorer: vec_to_array::<32>(st.gas_sponsorer().ok_or_else(|| {
+            Transaction::Unstake(Unstake {
+                delegator: vec_to_array::<32>(
+                    st.delegator()
+                        .ok_or_else(|| KalaError::validation("Missing sender".to_string()))?,
+                )?,
+                witness: vec_to_array::<32>(
+                    st.witness()
+                        .ok_or_else(|| KalaError::validation("Missing witness".to_string()))?,
+                )?,
+                amount: st.amount(),
+                nonce: st.nonce(),
+                signature: vec_to_array(
+                    st.signature()
+                        .ok_or_else(|| KalaError::validation("Missing signature".to_string()))?,
+                )?,
+                gas_sponsorer: vec_to_array::<32>(
+                    st.gas_sponsorer().ok_or_else(|| {
                         KalaError::validation("Missing gas_sponsorer".to_string())
-                    })?)?,
-                })
-            }
-            TxBody::SolveTx => {
-                let sv = tx
-                    .body_as_solve_tx()
-                    .ok_or_else(|| KalaError::validation("Invalid SolveTx".to_string()))?;
+                    })?,
+                )?,
+            })
+        }
+        TxBody::SolveTx => {
+            let sv = tx
+                .body_as_solve_tx()
+                .ok_or_else(|| KalaError::validation("Invalid SolveTx".to_string()))?;
 
-                Transaction::Solve(Solve {
-                    sender: vec_to_array::<32>(
-                        sv.sender()
-                            .ok_or_else(|| KalaError::validation("Missing sender".to_string()))?,
-                    )?,
-                    proof: vec_to_array(
-                        sv.proof()
-                            .ok_or_else(|| KalaError::validation("Missing proof".to_string()))?,
-                    )?,
-                    puzzle_id: vec_to_array::<32>(
-                        sv.puzzle_id().ok_or_else(|| {
-                            KalaError::validation("Missing puzzle_id".to_string())
-                        })?,
-                    )?,
-                    nonce: sv.nonce(),
-                    signature: vec_to_array(
-                        sv.signature().ok_or_else(|| {
-                            KalaError::validation("Missing signature".to_string())
-                        })?,
-                    )?,
-                    gas_sponsorer: vec_to_array::<32>(sv.gas_sponsorer().ok_or_else(|| {
+            Transaction::Solve(Solve {
+                sender: vec_to_array::<32>(
+                    sv.sender()
+                        .ok_or_else(|| KalaError::validation("Missing sender".to_string()))?,
+                )?,
+                proof: vec_to_array(
+                    sv.proof().ok_or_else(|| KalaError::validation("Missing proof".to_string()))?,
+                )?,
+                puzzle_id: vec_to_array::<32>(
+                    sv.puzzle_id()
+                        .ok_or_else(|| KalaError::validation("Missing puzzle_id".to_string()))?,
+                )?,
+                nonce: sv.nonce(),
+                signature: vec_to_array(
+                    sv.signature()
+                        .ok_or_else(|| KalaError::validation("Missing signature".to_string()))?,
+                )?,
+                gas_sponsorer: vec_to_array::<32>(
+                    sv.gas_sponsorer().ok_or_else(|| {
                         KalaError::validation("Missing gas_sponsorer".to_string())
-                    })?)?,
-                })
-            }
-            _ => {
-                return Err(KalaError::validation(
-                    "Invalid transaction type".to_string(),
-                ))
-            }
-        };
+                    })?,
+                )?,
+            })
+        }
+        _ => return Err(KalaError::validation("Invalid transaction type".to_string())),
+    };
 
     Ok(transaction)
 }
@@ -518,10 +509,7 @@ mod tests {
                 assert_eq!(a.signature, b.signature);
                 assert_eq!(a.gas_sponsorer, b.gas_sponsorer);
             }
-            _ => panic!(
-                "Transaction type mismatch: expected Unstake, got {:?}",
-                decoded
-            ),
+            _ => panic!("Transaction type mismatch: expected Unstake, got {:?}", decoded),
         }
     }
 
@@ -564,20 +552,13 @@ mod tests {
         let hash1 = hash_transaction(data1);
         let hash2 = hash_transaction(data2);
 
-        assert_ne!(
-            hash1, hash2,
-            "Different inputs should produce different hashes"
-        );
+        assert_ne!(hash1, hash2, "Different inputs should produce different hashes");
     }
 
     #[test]
     fn test_hash_empty_data() {
         let hash = hash_transaction(b"");
-        assert_eq!(
-            hash.len(),
-            32,
-            "Empty data should still produce 32-byte hash"
-        );
+        assert_eq!(hash.len(), 32, "Empty data should still produce 32-byte hash");
 
         // Known SHA-256 hash of empty string
         let expected = [
@@ -873,14 +854,8 @@ mod tests {
         }
         let ser_duration = start.elapsed();
 
-        println!(
-            "Serialized {} transactions in {:?}",
-            iterations, ser_duration
-        );
-        println!(
-            "Average serialization time: {:?}",
-            ser_duration / iterations
-        );
+        println!("Serialized {} transactions in {:?}", iterations, ser_duration);
+        println!("Average serialization time: {:?}", ser_duration / iterations);
 
         // Test deserialization performance
         let fb_bytes = transaction_to_flatbuffer(&tx).unwrap();
@@ -890,24 +865,14 @@ mod tests {
         }
         let deser_duration = start.elapsed();
 
-        println!(
-            "Deserialized {} transactions in {:?}",
-            iterations, deser_duration
-        );
-        println!(
-            "Average deserialization time: {:?}",
-            deser_duration / iterations
-        );
+        println!("Deserialized {} transactions in {:?}", iterations, deser_duration);
+        println!("Average deserialization time: {:?}", deser_duration / iterations);
 
         // Assert reasonable performance (< 100 microseconds per operation)
         let avg_ser_micros = ser_duration.as_micros() / (iterations as u128);
         let avg_deser_micros = deser_duration.as_micros() / (iterations as u128);
 
-        assert!(
-            avg_ser_micros < 100,
-            "Serialization too slow: {} microseconds",
-            avg_ser_micros
-        );
+        assert!(avg_ser_micros < 100, "Serialization too slow: {} microseconds", avg_ser_micros);
         assert!(
             avg_deser_micros < 100,
             "Deserialization too slow: {} microseconds",
@@ -970,10 +935,7 @@ mod tests {
         let fb_bytes1 = transaction_to_flatbuffer(&tx).unwrap();
         let fb_bytes2 = transaction_to_flatbuffer(&tx).unwrap();
 
-        assert_eq!(
-            fb_bytes1, fb_bytes2,
-            "Serialization should be deterministic"
-        );
+        assert_eq!(fb_bytes1, fb_bytes2, "Serialization should be deterministic");
 
         // Also verify the hash is stable
         let hash1 = hash_transaction(&fb_bytes1);
