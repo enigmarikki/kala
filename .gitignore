@@ -1,4 +1,54 @@
+# Build
 target/
+*.so
+*.o
+*.a
+
+# Database
 kala_db/
 kala_dev_db/
-.vscode
+*.db
+*.db-journal
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.zed/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Env
+.env
+.env.*
+*.local
+
+# Logs
+*.log
+logs/
+
+# Coverage
+coverage/
+*.profraw
+*.profdata
+lcov.info
+tarpaulin-report.html
+
+# Benchmarks
+criterion/
+
+# Generated
+*.generated.rs
+*_generated.rs
+
+# CUDA build artifacts
+crates/kala-timelocks/build/
+crates/kala-timelocks/bin/
+crates/kala-timelocks/lib/*.so
+
+# Claude
+.claude/

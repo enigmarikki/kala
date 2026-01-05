@@ -1,0 +1,50 @@
+[package]
+name = "kala-timelocks"
+version = "0.1.0"
+edition = "2021"
+authors = ["hrishi <hrishi98.m@gmail.com>"]
+description = "CUDA-accelerated RSW timelock puzzle solver"
+license = "MIT"
+readme = "README.md"
+
+
+[dependencies]
+thiserror = "2.0.16"
+rug = { version = "1.24", features = ["integer", "rand"] }
+
+# Optional AES-GCM support
+aes-gcm = { version = "0.10", optional = true }
+rand = { version = "0.8", optional = true }
+sha2 = { version = "0.10", optional = true }
+
+[features]
+default = []
+aes = ["aes-gcm", "rand", "sha2"]
+
+[build-dependencies]
+cc = "1.0"
+
+[dev-dependencies]
+hex = "0.4"
+criterion = "0.7.0"
+
+[[example]]
+name = "solve_puzzle"
+required-features = ["aes"]
+
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
+
+[profile.bench]
+opt-level = 3
+
+[lib]
+name = "timelocks"
+crate-type = ["lib", "staticlib", "cdylib"]
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]

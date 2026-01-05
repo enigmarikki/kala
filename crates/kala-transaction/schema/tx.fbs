@@ -1,0 +1,72 @@
+namespace tx;
+
+// Transaction types
+table SendTx {
+  sender:[ubyte];
+  receiver:[ubyte];
+  denom:[ubyte];
+  amount:ulong;
+  nonce:ulong;
+  signature:[ubyte];
+  gas_sponsorer:[ubyte];
+}
+
+table MintTx {
+  sender:[ubyte];
+  amount:ulong;
+  denom:[ubyte];
+  nonce:ulong;
+  signature:[ubyte];
+  gas_sponsorer:[ubyte];
+}
+
+table BurnTx {
+  sender:[ubyte];
+  amount:ulong;
+  denom:[ubyte];
+  nonce:ulong;
+  signature:[ubyte];
+  gas_sponsorer:[ubyte];
+}
+
+table StakeTx {
+  delegator:[ubyte];
+  witness:[ubyte];
+  amount:ulong;
+  nonce:ulong;
+  signature:[ubyte];
+  gas_sponsorer:[ubyte];
+}
+
+table UnstakeTx{
+  delegator:[ubyte];
+  witness:[ubyte];
+  amount:ulong;
+  nonce:ulong;
+  signature:[ubyte];
+  gas_sponsorer:[ubyte];
+}
+
+table SolveTx {
+  sender:[ubyte];
+  proof:[ubyte];
+  puzzle_id:[ubyte];
+  nonce:ulong;
+  signature:[ubyte];
+  gas_sponsorer:[ubyte];
+}
+union TxBody { SendTx, MintTx, BurnTx, StakeTx, UnstakeTx, SolveTx }
+
+// Main transaction table
+table Transaction {
+  body:TxBody;
+}
+
+// Sealed transaction for timelock
+table SealedTx {
+  nonce:[ubyte];
+  tag:[ubyte];
+  ciphertext:[ubyte];
+}
+
+root_type Transaction;

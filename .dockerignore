@@ -1,9 +1,34 @@
-kala_dev_db
-target
-.git
+# Build artifacts
+target/
+
+# Database files
+kala_db/
+kala_dev_db/
+
+# Git
+.git/
+.gitignore
+
+# Documentation
 *.md
-docs
-tick/src/*.o
-tick/src/*.s
-timelocks/build
-timelocks/bin
+docs/
+
+# IDE/Editor
+.vscode/
+.idea/
+
+# Scripts and config
+scripts/
+Makefile
+rustfmt.toml
+clippy.toml
+deny.toml
+
+# Native build artifacts
+crates/kala-timelocks/build/
+crates/kala-timelocks/bin/
+crates/kala-timelocks/*.o
+crates/kala-timelocks/*.so
+
+# Claude
+.claude/

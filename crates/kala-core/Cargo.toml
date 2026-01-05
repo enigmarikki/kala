@@ -1,0 +1,67 @@
+# Kala Core - The Heart of the Eternal Timeline
+#
+# This crate provides the main blockchain node implementation for Kala,
+# a VDF-based blockchain designed for trustless timestamping and MEV resistance.
+#
+# Components:
+# - KalaNode: Main node orchestrating the eternal VDF computation
+# - TickProcessor: Consensus engine handling the 4-phase tick processing
+# - NodeConfig: Configuration management with validation
+# - DevNode binary: Development node for testing and experimentation
+
+[package]
+name = "kala-core"
+version.workspace = true
+authors.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Core blockchain node implementation for Kala VDF-based consensus"
+keywords = ["blockchain", "vdf", "consensus", "timelock", "mev"]
+categories = ["cryptography", "network-programming"]
+repository.workspace = true
+
+[dependencies]
+# Internal Kala crates - the modular architecture
+kala-common = { workspace = true }                         # Shared utilities and types
+kala-tick = { workspace = true }                           # CVDF streaming implementation
+kala-state = { workspace = true }                          # State management
+kala-transaction = { workspace = true }                    # Transaction processing
+kala-rpc = { workspace = true }                            # JSON-RPC API server
+
+# Core async runtime and utilities
+tokio = { workspace = true }                               # Async runtime for concurrent operations
+futures = { workspace = true }                             # Future combinators
+async-trait = { workspace = true }                         # Async trait support
+
+# Error handling and logging
+anyhow = { workspace = true }                              # Flexible error handling
+tracing = { workspace = true }                             # Structured logging
+tracing-subscriber = { workspace = true }                 # Log subscriber implementations
+
+# CLI and configuration
+clap = { workspace = true }                                # Command line parsing for devnode
+serde = { workspace = true }                               # Serialization framework
+serde_json = { workspace = true }                          # JSON serialization
+serde_yaml = { workspace = true }                          # YAML config files
+toml = { workspace = true }                                # TOML config files
+
+# Cryptography and serialization
+sha2 = { workspace = true }                                # SHA-2 hash functions
+hex = { workspace = true }                                 # Hex encoding utilities
+bincode = { workspace = true }                             # Binary serialization
+
+# Mathematics for VDF operations
+num-bigint = { workspace = true }                          # Arbitrary precision integers
+rug = { workspace = true }                                  # High-precision arithmetic for CVDF
+blake3 = "1.5"                                             # Blake3 for CVDF hashing
+
+# RPC and networking
+jsonrpsee = { workspace = true }                           # JSON-RPC implementation
+tempfile = {workspace = true}
+
+# Development node binary - for testing and experimentation
+# Usage: cargo run -p kala-core --bin devnode -- --help
+#[[bin]]
+##name = "devnode"
+#path = "bin/devnode.rs"
+

@@ -1,0 +1,52 @@
+# Kala Clippy Configuration
+
+# Stack size threshold for large types
+too-large-for-stack = 128
+
+# Valid identifiers for documentation (domain-specific terms)
+doc-valid-idents = [
+    # Cryptographic terms
+    "VDF",
+    "CVDF",
+    "RSW",
+    "GMP",
+    "SHA",
+    "AES",
+    "GCM",
+
+    # Networking/Protocol terms
+    "P2P",
+    "RPC",
+    "JSON",
+    "API",
+    "HTTP",
+    "HTTPS",
+    "TCP",
+    "UDP",
+    "IPv4",
+    "IPv6",
+
+    # Storage/Data terms
+    "KiB",
+    "MiB",
+    "GiB",
+    "TiB",
+    "RocksDB",
+
+    # Project-specific terms
+    "Kala",
+    "Pietrzak",
+    "Wesolowski",
+    "MEV",
+    "FlatBuffers",
+    "CUDA",
+]
+
+# Allow debug assertions in tests
+allow-dbg-in-tests = true
+
+# Cognitive complexity threshold
+cognitive-complexity-threshold = 30
+
+# Type complexity threshold
+type-complexity-threshold = 300

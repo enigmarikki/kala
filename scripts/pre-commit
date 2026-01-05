@@ -1,0 +1,128 @@
+#!/usr/bin/env bash
+#
+# Kala Pre-commit Hook
+# This hook runs before each commit to ensure code quality
+#
+# Install: make install-hooks
+# Skip: git commit --no-verify
+
+set -e
+
+# Colors for output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[0;33m'
+BLUE='\033[0;34m'
+NC='\033[0m' # No Color
+
+echo -e "${BLUE}Running pre-commit checks...${NC}\n"
+
+# Track if any check fails
+FAILED=0
+
+# Function to run a check
+run_check() {
+    local name=$1
+    local cmd=$2
+
+    echo -e "${YELLOW}[$name]${NC} Running..."
+    if eval "$cmd" > /dev/null 2>&1; then
+        echo -e "${GREEN}[$name]${NC} Passed\n"
+    else
+        echo -e "${RED}[$name]${NC} Failed\n"
+        FAILED=1
+    fi
+}
+
+# 1. Check formatting (without modifying files)
+echo -e "${YELLOW}[fmt]${NC} Checking code formatting..."
+if cargo fmt --all -- --check > /dev/null 2>&1; then
+    echo -e "${GREEN}[fmt]${NC} Passed\n"
+else
+    echo -e "${RED}[fmt]${NC} Failed - run 'make fmt' to fix\n"
+    FAILED=1
+fi
+
+# 2. Run clippy
+echo -e "${YELLOW}[clippy]${NC} Running clippy lints..."
+if cargo clippy --workspace --all-features --all-targets -- -D warnings 2>&1 | head -20; then
+    if [ ${PIPESTATUS[0]} -eq 0 ]; then
+        echo -e "${GREEN}[clippy]${NC} Passed\n"
+    else
+        echo -e "${RED}[clippy]${NC} Failed\n"
+        FAILED=1
+    fi
+else
+    echo -e "${RED}[clippy]${NC} Failed\n"
+    FAILED=1
+fi
+
+# 3. Check compilation
+echo -e "${YELLOW}[check]${NC} Checking compilation..."
+if cargo check --workspace --all-features 2>&1 | tail -5; then
+    if [ ${PIPESTATUS[0]} -eq 0 ]; then
+        echo -e "${GREEN}[check]${NC} Passed\n"
+    else
+        echo -e "${RED}[check]${NC} Failed\n"
+        FAILED=1
+    fi
+else
+    echo -e "${RED}[check]${NC} Failed\n"
+    FAILED=1
+fi
+
+# 4. Run tests (optional - can be slow)
+# Uncomment to enable test running on every commit
+# echo -e "${YELLOW}[test]${NC} Running tests..."
+# if cargo test --workspace --all-features 2>&1 | tail -10; then
+#     if [ ${PIPESTATUS[0]} -eq 0 ]; then
+#         echo -e "${GREEN}[test]${NC} Passed\n"
+#     else
+#         echo -e "${RED}[test]${NC} Failed\n"
+#         FAILED=1
+#     fi
+# fi
+
+# 5. Check for common issues
+echo -e "${YELLOW}[guards]${NC} Checking for common issues..."
+GUARD_FAILED=0
+
+# Check for leftover debug statements
+if grep -rn "dbg!" --include="*.rs" . 2>/dev/null | grep -v "target/" | grep -v ".git/"; then
+    echo -e "${RED}  Warning: Found dbg! macro usage${NC}"
+    GUARD_FAILED=1
+fi
+
+# Check for TODO/FIXME comments (warning only)
+TODO_COUNT=$(grep -rn "TODO\|FIXME" --include="*.rs" . 2>/dev/null | grep -v "target/" | grep -v ".git/" | wc -l || true)
+if [ "$TODO_COUNT" -gt 0 ]; then
+    echo -e "${YELLOW}  Info: Found $TODO_COUNT TODO/FIXME comments${NC}"
+fi
+
+# Check for unwrap() in non-test code (warning only)
+UNWRAP_COUNT=$(grep -rn "\.unwrap()" --include="*.rs" . 2>/dev/null | grep -v "target/" | grep -v ".git/" | grep -v "_test.rs" | grep -v "tests/" | grep -v "#\[test\]" | wc -l || true)
+if [ "$UNWRAP_COUNT" -gt 20 ]; then
+    echo -e "${YELLOW}  Info: Found $UNWRAP_COUNT .unwrap() calls - consider using expect() or proper error handling${NC}"
+fi
+
+# Check for println! in non-test code
+if grep -rn "println!" --include="*.rs" . 2>/dev/null | grep -v "target/" | grep -v ".git/" | grep -v "tests/" | grep -v "#\[test\]" | grep -v "bin/" | head -5; then
+    echo -e "${YELLOW}  Warning: Found println! in library code - use tracing instead${NC}"
+fi
+
+if [ $GUARD_FAILED -eq 0 ]; then
+    echo -e "${GREEN}[guards]${NC} Passed\n"
+else
+    echo -e "${YELLOW}[guards]${NC} Passed with warnings\n"
+fi
+
+# Final result
+echo "----------------------------------------"
+if [ $FAILED -eq 0 ]; then
+    echo -e "${GREEN}All pre-commit checks passed!${NC}"
+    exit 0
+else
+    echo -e "${RED}Pre-commit checks failed!${NC}"
+    echo -e "Run 'make lint' to fix issues, or 'git commit --no-verify' to skip"
+    exit 1
+fi

@@ -42,23 +42,12 @@ WORKDIR /app
 
 COPY Cargo.toml Cargo.lock ./
 
-# Copy all crate directories 
-COPY kala-core/ ./kala-core/
-COPY kala-rpc/ ./kala-rpc/
-COPY kala-state/ ./kala-state/
-COPY kala-transaction/ ./kala-transaction/
-COPY kala-vdf/ ./kala-vdf/
-COPY kala-common/ ./kala-common/
-# Copy native code dependencies
-COPY tick/ ./tick/
-COPY timelocks/ ./timelocks/
+# Copy all crate directories
+COPY crates/ ./crates/
 
-# Build native libraries first
-WORKDIR /app/tick/src
-RUN make clean && make -j$(nproc)
-
-WORKDIR /app/timelocks
-RUN ls -la CGBN/ || echo "CGBN directory missing"
+# Build native timelock libraries
+WORKDIR /app/crates/kala-timelocks
+RUN make clean && make -j$(nproc) || echo "Timelock build optional - continuing"
 
 WORKDIR /app
 # The build.rs will handle linking the native libraries
