@@ -1,0 +1,75 @@
+# Kala Cargo Deny Configuration
+# Dependency auditing for licenses, security, and sources
+
+[graph]
+targets = []
+all-features = true
+
+# Advisory database configuration for security vulnerabilities
+[advisories]
+db-path = "~/.cargo/advisory-db"
+ignore = []
+
+# License requirements
+[licenses]
+# Confidence threshold for license detection
+confidence-threshold = 0.93
+
+# Allowed license types
+allow = [
+    "MIT",
+    "Apache-2.0",
+    "Apache-2.0 WITH LLVM-exception",
+    "BSD-2-Clause",
+    "BSD-3-Clause",
+    "ISC",
+    "Unlicense",
+    "Zlib",
+    "MPL-2.0",
+    "Unicode-3.0",
+    "Unicode-DFS-2016",
+    "CC0-1.0",
+    "BSL-1.0",
+]
+
+# Deny copyleft licenses
+deny = [
+    "GPL-2.0",
+    "GPL-3.0",
+    "AGPL-3.0",
+]
+
+# Crate-specific license exceptions
+exceptions = []
+
+# Source restrictions
+[sources]
+unknown-registry = "deny"
+unknown-git = "deny"
+
+# Allowed git sources
+allow-git = [
+    "https://github.com/enigmarikki/kala",
+]
+
+[sources.allow-org]
+github = ["enigmarikki"]
+
+# Banned crates and features
+[bans]
+multiple-versions = "warn"
+wildcards = "warn"
+highlight = "all"
+
+# Deny specific problematic crates
+deny = [
+    # Prefer rustls over openssl for security
+    { name = "openssl" },
+    { name = "openssl-sys" },
+]
+
+# Skip duplicate version checks for these crates
+skip = []
+
+# Skip specific versions
+skip-tree = []

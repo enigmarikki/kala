@@ -111,3 +111,64 @@ opt-level = 3           # Highest optimization level
 # Benchmark profile inherits release optimizations
 [profile.bench]
 inherits = "release"     # Use release settings for accurate benchmarks
+
+# Profiling profile - keeps debug symbols for performance analysis
+[profile.profiling]
+inherits = "release"
+debug = true
+strip = false
+
+# Workspace-wide lint configuration
+[workspace.lints.rust]
+# Deny unsafe code by default (can be overridden per-crate)
+# unsafe_code = "deny"
+
+# Missing implementations
+missing_debug_implementations = "warn"
+missing_docs = "warn"
+
+# Code quality
+rust_2018_idioms = "deny"
+trivial_casts = "warn"
+trivial_numeric_casts = "warn"
+unused_lifetimes = "warn"
+unused_import_braces = "warn"
+unreachable_pub = "warn"
+
+# Must-use types
+unused_must_use = "deny"
+
+[workspace.lints.clippy]
+# Correctness
+derive_partial_eq_without_eq = "warn"
+
+# Style
+doc_markdown = "warn"
+explicit_iter_loop = "warn"
+explicit_into_iter_loop = "warn"
+implicit_clone = "warn"
+match_bool = "warn"
+needless_borrow = "warn"
+needless_continue = "warn"
+needless_for_each = "warn"
+
+# Performance
+inefficient_to_string = "warn"
+manual_string_new = "warn"
+map_unwrap_or = "warn"
+trivially_copy_pass_by_ref = "warn"
+
+# Complexity
+too_many_arguments = "warn"
+type_complexity = "warn"
+
+# Pedantic (helpful but optional)
+cloned_instead_of_copied = "warn"
+flat_map_option = "warn"
+fn_params_excessive_bools = "warn"
+
+# Restriction (explicitly allowed patterns)
+dbg_macro = "warn"
+print_stdout = "warn"
+print_stderr = "warn"
+todo = "warn"
