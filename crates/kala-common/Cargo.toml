@@ -30,3 +30,8 @@ tempfile = "*"
 [features]
 default = ["flatbuffers"]
 flatbuffers = ["dep:flatbuffers"]
+dev = ["dep:rand"]
+
+[dependencies.rand]
+workspace = true
+optional = true

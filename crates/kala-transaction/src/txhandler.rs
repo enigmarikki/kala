@@ -74,10 +74,15 @@ pub fn encrypt_transaction(
 
     // Extract tag from the end of ciphertext (last 16 bytes)
     let (encrypted_data, tag_bytes) = ciphertext.split_at(ciphertext.len() - TAG_SIZE);
-    let tag: Tag128 =
-        tag_bytes.try_into().map_err(|_| KalaError::crypto("Invalid tag size".to_string()))?;
+    let tag: Tag128 = tag_bytes
+        .try_into()
+        .map_err(|_| KalaError::crypto("Invalid tag size".to_string()))?;
 
-    Ok(SealedTransaction { nonce: nonce_array, tag, ciphertext: encrypted_data.to_vec() })
+    Ok(SealedTransaction {
+        nonce: nonce_array,
+        tag,
+        ciphertext: encrypted_data.to_vec(),
+    })
 }
 
 /// Decrypts a sealed transaction using AES-256-GCM
@@ -114,11 +119,14 @@ pub struct RSWTimelock {
 impl RSWTimelock {
     pub fn new(modulus_bits: usize) -> KalaResult<Self> {
         // Try to create GPU solver, fall back to CPU if not available
-        let solver = Solver::default()
+        let solver = Solver::try_default()
             .or_else(|_| Solver::new(0))
             .map_err(|e| KalaError::crypto(format!("Failed to create RSW solver: {e}")))?;
 
-        Ok(Self { solver, modulus_bits })
+        Ok(Self {
+            solver,
+            modulus_bits,
+        })
     }
 
     /// Generate RSW puzzle parameters
@@ -174,7 +182,12 @@ impl RSWTimelock {
         let a_bytes = a.to_digits::<u8>(Order::Msf);
         let puzzle_bytes = puzzle_value.to_digits::<u8>(Order::Msf);
 
-        Ok(RSWPuzzle { puzzle_value: puzzle_bytes, a: a_bytes, n: n_bytes, hardness })
+        Ok(RSWPuzzle {
+            puzzle_value: puzzle_bytes,
+            a: a_bytes,
+            n: n_bytes,
+            hardness,
+        })
     }
 
     /// Solve RSW puzzle to recover key using GPU acceleration
@@ -198,7 +211,12 @@ impl RSWTimelock {
         let puzzle_inputs: Vec<(String, String, String, u32)> = puzzles
             .iter()
             .map(|p| {
-                (hex::encode(&p.n), hex::encode(&p.a), hex::encode(&p.puzzle_value), p.hardness)
+                (
+                    hex::encode(&p.n),
+                    hex::encode(&p.a),
+                    hex::encode(&p.puzzle_value),
+                    p.hardness,
+                )
             })
             .collect();
 
@@ -438,7 +456,7 @@ mod tests {
 
         assert!(result.is_err());
         if let Err(e) = result {
-            let error_msg = format!("{}", e);
+            let error_msg = format!("{e}");
             assert!(error_msg.contains("AES-GCM decryption failed"));
         }
     }
@@ -568,7 +586,10 @@ mod tests {
 
         for size in sizes {
             let result = RSWTimelock::new(size);
-            assert!(result.is_ok(), "Failed to create RSWTimelock with {} bits", size);
+            assert!(
+                result.is_ok(),
+                "Failed to create RSWTimelock with {size} bits"
+            );
 
             let timelock = result.unwrap();
             assert_eq!(timelock.modulus_bits, size);
@@ -722,7 +743,7 @@ mod tests {
         let mut timelock_txs = Vec::new();
 
         for (i, tx) in transactions.iter().enumerate() {
-            let timelock_tx = create_timelock_transaction(tx, &ctx, 500 + i as u64).unwrap();
+            let timelock_tx = create_timelock_transaction(tx, &ctx, 500 + i as u128).unwrap();
             timelock_txs.push(timelock_tx);
         }
 
@@ -787,7 +808,7 @@ mod tests {
         }
         let duration = start.elapsed();
 
-        println!("Encrypted {} transactions in {:?}", iterations, duration);
+        println!("Encrypted {iterations} transactions in {duration:?}");
         println!("Average time per encryption: {:?}", duration / iterations);
     }
 
@@ -804,7 +825,7 @@ mod tests {
         }
         let duration = start.elapsed();
 
-        println!("Generated and solved {} puzzles in {:?}", iterations, duration);
+        println!("Generated and solved {iterations} puzzles in {duration:?}");
         println!("Average time per puzzle: {:?}", duration / iterations);
     }
 

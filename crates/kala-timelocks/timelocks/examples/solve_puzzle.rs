@@ -1,11 +1,10 @@
 use aes_gcm::{
     aead::{Aead, AeadCore, KeyInit, OsRng},
-    Aes256Gcm, Key, Nonce,
+    Aes256Gcm, Key,
 };
 use rand::Rng;
 use rug::rand::RandState;
-use rug::{Complete, Integer};
-use std::io::Write;
+use rug::Integer;
 use std::time::Instant;
 use timelocks::Solver;
 
@@ -19,7 +18,7 @@ struct TimelockClient {
 impl TimelockClient {
     /// Generate new client with random primes of specified bit size
     fn generate(bits: u32) -> Self {
-        println!("Generating {}-bit RSA modulus...", bits);
+        println!("Generating {bits}-bit RSA modulus...");
         let start = Instant::now();
 
         let mut rand = RandState::new();
@@ -51,12 +50,6 @@ impl TimelockClient {
         Self { p, q, n }
     }
 
-    /// Create a new client with known factors
-    fn new(p: Integer, q: Integer) -> Self {
-        let n = Integer::from(&p * &q);
-        Self { p, q, n }
-    }
-
     /// Create timelock puzzle using Euler's theorem (fast because we know p,q)
     /// Returns (C, time_taken) where C = (a^(2^T) + k) mod n
     fn create_puzzle(&self, a: u32, t: u32, key: &[u8; 32]) -> (String, std::time::Duration) {
@@ -74,10 +67,14 @@ impl TimelockClient {
 
         // Reduce exponent: 2^T mod λ(n)
         let two = Integer::from(2);
-        let reduced_exp = two.pow_mod(&Integer::from(t), &lambda).expect("pow_mod failed");
+        let reduced_exp = two
+            .pow_mod(&Integer::from(t), &lambda)
+            .expect("pow_mod failed");
 
         // Compute a^(2^T mod λ(n)) mod n (fast!)
-        let a_power = a_int.pow_mod(&reduced_exp, &self.n).expect("pow_mod failed");
+        let a_power = a_int
+            .pow_mod(&reduced_exp, &self.n)
+            .expect("pow_mod failed");
 
         // C = (a^(2^T) + k) mod n
         let c = (a_power + k) % &self.n;
@@ -98,16 +95,18 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     OsRng.fill(&mut key);
 
     println!("Original message: {}", String::from_utf8_lossy(message));
-    println!("Generated key: {}", hex::encode(&key));
+    println!("Generated key: {}", hex::encode(key));
 
     // 2. Encrypt message with AES-GCM
-    let cipher = Aes256Gcm::new(&Key::<Aes256Gcm>::from_slice(&key));
+    let cipher = Aes256Gcm::new(Key::<Aes256Gcm>::from_slice(&key));
     let nonce = Aes256Gcm::generate_nonce(&mut OsRng);
-    let ciphertext = cipher.encrypt(&nonce, message.as_ref()).expect("encryption failed");
+    let ciphertext = cipher
+        .encrypt(&nonce, message.as_ref())
+        .expect("encryption failed");
 
     let (ct, tag) = ciphertext.split_at(ciphertext.len() - 16);
     println!("\nEncrypted:");
-    println!("  IV: {}", hex::encode(&nonce));
+    println!("  IV: {}", hex::encode(nonce));
     println!("  Ciphertext: {}", hex::encode(ct));
     println!("  Tag: {}", hex::encode(tag));
 
@@ -120,45 +119,47 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let t = 32_768u32; // ~32k iterations for benchmarking
 
     println!("\nRSA modulus (n): {}", client.n.to_string_radix(16));
-    println!("Time parameter T: {} (2^{} squarings required)", t, t);
+    println!("Time parameter T: {t} (2^{t} squarings required)");
 
     let (puzzle_c, create_time) = client.create_puzzle(a, t, &key);
 
-    println!("\nPuzzle created in: {:?} (using Euler's theorem)", create_time);
+    println!("\nPuzzle created in: {create_time:?} (using Euler's theorem)");
     println!("Puzzle parameters:");
     println!("  n = {}", client.n.to_string_radix(16));
-    println!("  a = {}", a);
-    println!("  C = {}", puzzle_c);
-    println!("  T = {}", t);
+    println!("  a = {a}");
+    println!("  C = {puzzle_c}");
+    println!("  T = {t}");
 
     // 4. GPU solver (doesn't know p,q) must do sequential squaring
     println!("\n=== GPU Solving (Sequential Squaring) ===");
-    let solver = Solver::default()?;
+    let solver = Solver::try_default()?;
     println!("Using GPU: {}", solver.device_name());
 
     let start = Instant::now();
     let result = solver.solve(&client.n.to_string_radix(16), &a.to_string(), &puzzle_c, t)?;
     let solve_time = start.elapsed();
 
-    println!("GPU solved in: {:?}", solve_time);
-    println!("Recovered key: {}", hex::encode(&result.key));
+    println!("GPU solved in: {solve_time:?}");
+    println!("Recovered key: {}", hex::encode(result.key));
 
     // Compare times
     let speedup = solve_time.as_secs_f64() / create_time.as_secs_f64();
     println!("\n Time comparison:");
-    println!("  Client (with factors): {:?}", create_time);
-    println!("  GPU (without factors): {:?}", solve_time);
-    println!("  Slowdown factor: {:.0}x", speedup);
+    println!("  Client (with factors): {create_time:?}");
+    println!("  GPU (without factors): {solve_time:?}");
+    println!("  Slowdown factor: {speedup:.0}x");
 
     // 5. Verify and decrypt
     println!("\n=== Decrypting Message ===");
     assert_eq!(key, result.key, "Key recovery failed!");
 
-    let recovered_cipher = Aes256Gcm::new(&Key::<Aes256Gcm>::from_slice(&result.key));
+    let recovered_cipher = Aes256Gcm::new(Key::<Aes256Gcm>::from_slice(&result.key));
     let mut full_ct = ct.to_vec();
     full_ct.extend_from_slice(tag);
 
-    let plaintext = recovered_cipher.decrypt(&nonce, full_ct.as_ref()).expect("decryption failed");
+    let plaintext = recovered_cipher
+        .decrypt(&nonce, full_ct.as_ref())
+        .expect("decryption failed");
 
     println!("Decrypted message: {}", String::from_utf8_lossy(&plaintext));
     assert_eq!(message, plaintext.as_slice());
@@ -167,12 +168,17 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("\n=== Batch Benchmark (10K puzzles with GPU parallelism) ===");
 
     let batch_size = 12_000;
-    println!("Creating {} puzzle instances...", batch_size);
+    println!("Creating {batch_size} puzzle instances...");
 
     // Create a vector of the same puzzle repeated (matches original benchmark)
     let mut batch_puzzles = Vec::with_capacity(batch_size);
     for _ in 0..batch_size {
-        batch_puzzles.push((client.n.to_string_radix(16), a.to_string(), puzzle_c.clone(), t));
+        batch_puzzles.push((
+            client.n.to_string_radix(16),
+            a.to_string(),
+            puzzle_c.clone(),
+            t,
+        ));
     }
 
     // Warm up
@@ -195,16 +201,16 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let puzzles_per_sec = 1000.0 / ms_per_puzzle;
 
     println!("\n===== BATCH BENCHMARK RESULTS =====");
-    println!("Total puzzles: {}", batch_size);
-    println!("Correct solutions: {}/{}", correct_count, batch_size);
-    println!("Total time: {:?}", batch_time);
-    println!("Time per puzzle: {:.3} ms", ms_per_puzzle);
-    println!("Throughput: {:.1} puzzles/sec", puzzles_per_sec);
+    println!("Total puzzles: {batch_size}");
+    println!("Correct solutions: {correct_count}/{batch_size}");
+    println!("Total time: {batch_time:?}");
+    println!("Time per puzzle: {ms_per_puzzle:.3} ms");
+    println!("Throughput: {puzzles_per_sec:.1} puzzles/sec");
     println!("===================================");
 
     // Compare with sequential solving
-    let speedup = (110.0 / ms_per_puzzle); // ~110ms was the single solve time
-    println!("\n Batch solving is {:.0}x faster than sequential!", speedup);
+    let speedup = 110.0 / ms_per_puzzle; // ~110ms was the single solve time
+    println!("\n Batch solving is {speedup:.0}x faster than sequential!");
     println!("   This matches the original CUDA benchmark performance!");
 
     Ok(())

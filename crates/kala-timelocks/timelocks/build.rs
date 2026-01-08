@@ -21,9 +21,12 @@ fn main() {
 
         // Run make in the parent directory
         let status = Command::new("make")
-            .current_dir(&timelocks_root)
+            .current_dir(timelocks_root)
             .arg("lib")
-            .arg(format!("SM={}", env::var("CUDA_SM").unwrap_or_else(|_| "75".to_string())))
+            .arg(format!(
+                "SM={}",
+                env::var("CUDA_SM").unwrap_or_else(|_| "75".to_string())
+            ))
             .status()
             .expect("Failed to run make");
 
@@ -39,7 +42,7 @@ fn main() {
     cc::Build::new()
         .cpp(true)
         .file(timelocks_root.join("solver_api.cpp"))
-        .include(&timelocks_root)
+        .include(timelocks_root)
         .include("/usr/local/cuda/include")
         .flag("-std=c++17")
         .flag("-fPIC")
@@ -50,7 +53,7 @@ fn main() {
 
     // CUDA paths
     if let Ok(cuda_path) = env::var("CUDA_PATH") {
-        println!("cargo:rustc-link-search=native={}/lib64", cuda_path);
+        println!("cargo:rustc-link-search=native={cuda_path}/lib64");
     } else {
         println!("cargo:rustc-link-search=native=/usr/local/cuda/lib64");
         println!("cargo:rustc-link-search=native=/opt/cuda/lib64");

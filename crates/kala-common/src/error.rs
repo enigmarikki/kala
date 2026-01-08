@@ -7,41 +7,57 @@ use thiserror::Error;
 /// Standard result type used throughout Kala
 pub type KalaResult<T> = std::result::Result<T, KalaError>;
 
+/// Errors related to CVDF (Class-group Verifiable Delay Function) operations
 #[derive(Error, Debug)]
 pub enum CVDFError {
+    /// The discriminant value is invalid
     #[error("Invalid discriminant")]
     InvalidDiscriminant,
 
+    /// The class group element is invalid
     #[error("Invalid class group element")]
     InvalidElement,
 
+    /// Proof verification failed at the specified step
     #[error("Invalid proof at step {step}")]
-    InvalidProof { step: usize },
+    InvalidProof {
+        /// The step number where verification failed
+        step: usize,
+    },
 
+    /// General computation error
     #[error("Computation error: {0}")]
     ComputationError(String),
 
+    /// Serialization failed
     #[error("Serialization error : {0}")]
     SerializationError(String),
 
+    /// Deserialization failed
     #[error("Deserialization error : {0}")]
     DeserializationError(String),
 
+    /// State transition is invalid
     #[error("Invalid state transition")]
     InvalidStateTransition,
 
+    /// Frontier verification failed
     #[error("Frontier verification failed")]
     FrontierVerificationFailed,
 
+    /// Reduction operation failed
     #[error("Reduction failed")]
     ReductionFailed,
 
+    /// Division operation failed
     #[error("Division error")]
     DivisionError,
 
+    /// The form is invalid
     #[error("Invalid form")]
     InvalidForm,
 
+    /// A lock was poisoned
     #[error("Lock poisoned: {0}")]
     LockPoisoned(String),
 }
@@ -64,58 +80,58 @@ impl<T> From<PoisonError<RwLockWriteGuard<'_, T>>> for CVDFError {
 /// Comprehensive error type for all Kala operations
 #[derive(Error, Debug)]
 pub enum KalaError {
-    // Serialization errors
+    /// Serialization errors
     #[error("Serialization error: {0}")]
     Serialization(String),
-    // Deserialization errors
+    /// Deserialization errors
     #[error("Serialization error: {0}")]
     Deserialization(String),
 
-    // Network errors
+    /// Network errors
     #[error("Network error: {0}")]
     Network(String),
 
-    // Database errors
+    /// Database errors
     #[error("Database error: {0}")]
     Database(#[from] rocksdb::Error),
 
-    // Validation errors
+    /// Validation errors
     #[error("Validation error: {0}")]
     Validation(String),
 
-    // Cryptographic errors
+    /// Cryptographic errors
     #[error("Crypto error: {0}")]
     Crypto(String),
 
-    // Transaction errors
+    /// Transaction errors
     #[error("Transaction error: {0}")]
     Transaction(String),
 
-    // VDF computation errors
+    /// VDF computation errors
     #[error("CVDF error: {0}")]
     CVDFError(CVDFError),
 
-    // State management errors
+    /// State management errors
     #[error("State error: {0}")]
     State(String),
 
-    // Configuration errors
+    /// Configuration errors
     #[error("Config error: {0}")]
     Config(String),
 
-    // I/O errors
+    /// I/O errors
     #[error("I/O error: {0}")]
     IO(#[from] std::io::Error),
 
-    // JSON errors
+    /// JSON errors
     #[error("JSON error: {0}")]
     Json(#[from] serde_json::Error),
 
-    // Generic errors
+    /// Generic internal errors
     #[error("Internal error: {0}")]
     Internal(String),
 
-    // External library errors
+    /// External library errors
     #[error("External error: {0}")]
     External(#[from] anyhow::Error),
 }

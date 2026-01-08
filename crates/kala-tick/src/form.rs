@@ -3,7 +3,7 @@ use crate::discriminant::Discriminant;
 use rug::{ops::NegAssign, Assign, Integer};
 use serde::{Deserialize, Serialize};
 use std::ops::SubAssign;
-use tracing::{debug, warn};
+use tracing::warn;
 
 /// Binary quadratic form representing a class group element
 /// Form: ax² + bxy + cy²
@@ -30,13 +30,21 @@ impl QuadraticForm {
         // Handle invalid discriminant gracefully instead of panicking
         if discriminant.value >= zero {
             warn!("Invalid discriminant: should be negative, using default");
-            return QuadraticForm { a: Integer::from(1), b: Integer::from(0), c: Integer::from(1) };
+            return QuadraticForm {
+                a: Integer::from(1),
+                b: Integer::from(0),
+                c: Integer::from(1),
+            };
         }
 
         let mut c = Integer::new();
         c.assign(1 - &discriminant.value);
         c /= 4;
-        QuadraticForm { a: Integer::from(1), b: Integer::from(1), c }
+        QuadraticForm {
+            a: Integer::from(1),
+            b: Integer::from(1),
+            c,
+        }
     }
 
     /// Check if this form is reduced
@@ -140,7 +148,10 @@ impl QuadraticForm {
         let original_disc = self.discriminant();
         let new_disc = result.discriminant();
         if original_disc != new_disc {
-            warn!("Discriminant mismatch: original={}, new={}", original_disc, new_disc);
+            warn!(
+                "Discriminant mismatch: original={}, new={}",
+                original_disc, new_disc
+            );
         }
         result
     }
@@ -179,10 +190,12 @@ mod integer_serde {
     {
         let s = String::deserialize(deserializer)?;
         if s.is_empty() {
-            return Err(serde::de::Error::custom("Empty string is not a valid integer"));
+            return Err(serde::de::Error::custom(
+                "Empty string is not a valid integer",
+            ));
         }
         Integer::from_str_radix(&s, 16)
-            .map_err(|e| serde::de::Error::custom(format!("Invalid hex integer: {}", e)))
+            .map_err(|e| serde::de::Error::custom(format!("Invalid hex integer: {e}")))
     }
 }
 
@@ -197,7 +210,9 @@ mod tests {
 
     fn init_tracing() {
         TRACING.get_or_init(|| {
-            tracing_subscriber::fmt().with_max_level(tracing::Level::DEBUG).init();
+            tracing_subscriber::fmt()
+                .with_max_level(tracing::Level::DEBUG)
+                .init();
         });
     }
 
@@ -211,7 +226,10 @@ mod tests {
 
     #[test]
     fn test_identity_element() {
-        let disc = Discriminant { value: Integer::from(-23), bit_length: 6 };
+        let disc = Discriminant {
+            value: Integer::from(-23),
+            bit_length: 6,
+        };
         let identity = QuadraticForm::identity(&disc);
         assert_eq!(identity.a, 1);
         assert_eq!(identity.b, 1);
@@ -221,12 +239,18 @@ mod tests {
 
     #[test]
     fn test_identity_element_various_discriminants() {
-        let disc = Discriminant { value: Integer::from(-3), bit_length: 3 };
+        let disc = Discriminant {
+            value: Integer::from(-3),
+            bit_length: 3,
+        };
         let identity = QuadraticForm::identity(&disc);
         assert_eq!(identity.c, 1);
         assert_eq!(identity.discriminant(), -3);
 
-        let disc = Discriminant { value: Integer::from(-7), bit_length: 4 };
+        let disc = Discriminant {
+            value: Integer::from(-7),
+            bit_length: 4,
+        };
         let identity = QuadraticForm::identity(&disc);
         assert_eq!(identity.c, 2);
         assert_eq!(identity.discriminant(), -7);
@@ -333,7 +357,10 @@ mod tests {
 
     #[test]
     fn test_is_valid() {
-        let disc = Discriminant { value: Integer::from(-23), bit_length: 6 };
+        let disc = Discriminant {
+            value: Integer::from(-23),
+            bit_length: 6,
+        };
         let valid_form = QuadraticForm::new(Integer::from(1), Integer::from(1), Integer::from(6));
         assert!(valid_form.is_valid(&disc));
 
@@ -364,7 +391,10 @@ mod tests {
     fn test_large_discriminant_with_bit_length() {
         let large_disc_value = Integer::from(-1_000_000_007_i64);
         let bit_length = 31;
-        let disc = Discriminant { value: large_disc_value.clone(), bit_length };
+        let disc = Discriminant {
+            value: large_disc_value.clone(),
+            bit_length,
+        };
         let identity = QuadraticForm::identity(&disc);
         assert_eq!(identity.discriminant(), large_disc_value);
         let expected_c = Integer::from(1 - &large_disc_value) / 4;
@@ -373,12 +403,21 @@ mod tests {
 
     #[test]
     fn test_discriminant_bit_length_consistency() {
-        let disc1 = Discriminant { value: Integer::from(-23), bit_length: 6 };
-        let disc2 = Discriminant { value: Integer::from(-23), bit_length: 6 };
+        let disc1 = Discriminant {
+            value: Integer::from(-23),
+            bit_length: 6,
+        };
+        let disc2 = Discriminant {
+            value: Integer::from(-23),
+            bit_length: 6,
+        };
         let form = QuadraticForm::new(Integer::from(1), Integer::from(1), Integer::from(6));
         assert!(form.is_valid(&disc1));
         assert!(form.is_valid(&disc2));
-        assert_eq!(QuadraticForm::identity(&disc1), QuadraticForm::identity(&disc2));
+        assert_eq!(
+            QuadraticForm::identity(&disc1),
+            QuadraticForm::identity(&disc2)
+        );
     }
 
     #[test]
@@ -407,7 +446,10 @@ mod tests {
 
     #[test]
     fn test_invalid_discriminant() {
-        let disc = Discriminant { value: Integer::from(-5), bit_length: 4 };
+        let disc = Discriminant {
+            value: Integer::from(-5),
+            bit_length: 4,
+        };
         // After our refactoring, identity no longer panics but returns an identity form
         // This is actually better behavior for a robust system
         let identity_form = QuadraticForm::identity(&disc);
@@ -430,7 +472,10 @@ mod tests {
 
     #[test]
     fn test_large_discriminant_edge_case() {
-        let disc = Discriminant { value: Integer::from(-1_000_000_003), bit_length: 31 };
+        let disc = Discriminant {
+            value: Integer::from(-1_000_000_003),
+            bit_length: 31,
+        };
         let form = QuadraticForm::identity(&disc);
         assert!(form.is_valid(&disc));
         assert!(form.is_reduced());
@@ -440,7 +485,10 @@ mod tests {
     fn test_reduce_large_values() {
         init_tracing();
         let disc_value = Integer::from_str_radix("-FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF", 16).unwrap();
-        let disc = Discriminant { value: disc_value.clone(), bit_length: 512 };
+        let disc = Discriminant {
+            value: disc_value.clone(),
+            bit_length: 512,
+        };
         let form = QuadraticForm::identity(&disc);
         let reduced = form.reduce();
         assert!(
@@ -457,7 +505,10 @@ mod tests {
         init_tracing();
         let disc_value = Integer::from_str_radix("-3fe0000000000000000f", 16).unwrap();
         let bit_length = 67;
-        let disc = Discriminant { value: disc_value.clone(), bit_length };
+        let disc = Discriminant {
+            value: disc_value.clone(),
+            bit_length,
+        };
         let form = QuadraticForm::identity(&disc);
         let reduced = form.reduce();
         assert!(

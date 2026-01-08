@@ -40,14 +40,16 @@ impl ValidationUtils {
     /// Validate and parse public key from hex string
     pub fn validate_pubkey_hex(hex_str: &str) -> KalaResult<PublicKey> {
         Self::validate_hex_string(hex_str, 32)?;
-        let bytes = hex::decode(hex_str)
-            .map_err(|e| KalaError::validation(format!("Invalid hex: {}", e)))?;
+        let bytes =
+            hex::decode(hex_str).map_err(|e| KalaError::validation(format!("Invalid hex: {e}")))?;
 
         let mut pubkey = [0u8; 32];
         pubkey.copy_from_slice(&bytes);
 
         if !CryptoUtils::validate_pubkey(&pubkey) {
-            return Err(KalaError::validation("Invalid public key: zero or invalid format"));
+            return Err(KalaError::validation(
+                "Invalid public key: zero or invalid format",
+            ));
         }
 
         Ok(pubkey)
@@ -56,14 +58,16 @@ impl ValidationUtils {
     /// Validate and parse signature from hex string  
     pub fn validate_signature_hex(hex_str: &str) -> KalaResult<Signature> {
         Self::validate_hex_string(hex_str, 64)?;
-        let bytes = hex::decode(hex_str)
-            .map_err(|e| KalaError::validation(format!("Invalid hex: {}", e)))?;
+        let bytes =
+            hex::decode(hex_str).map_err(|e| KalaError::validation(format!("Invalid hex: {e}")))?;
 
         let mut signature = [0u8; 64];
         signature.copy_from_slice(&bytes);
 
         if !CryptoUtils::validate_signature(&signature) {
-            return Err(KalaError::validation("Invalid signature: zero or invalid format"));
+            return Err(KalaError::validation(
+                "Invalid signature: zero or invalid format",
+            ));
         }
 
         Ok(signature)
@@ -122,7 +126,7 @@ impl ValidationUtils {
     /// Validate JSON structure
     pub fn validate_json_string(json_str: &str) -> KalaResult<serde_json::Value> {
         serde_json::from_str(json_str)
-            .map_err(|e| KalaError::validation(format!("Invalid JSON: {}", e)))
+            .map_err(|e| KalaError::validation(format!("Invalid JSON: {e}")))
     }
 
     /// Validate amount/value (for transactions)
@@ -175,12 +179,15 @@ impl ValidationUtils {
         Self::validate_string_length(address, 128, "Address")?;
 
         // Basic format validation - addresses should be hex or base58
-        if address.starts_with("0x") {
+        if let Some(hex_part) = address.strip_prefix("0x") {
             // Hex format
-            Self::validate_hex_string(&address[2..], address.len() / 2 - 1)?;
+            Self::validate_hex_string(hex_part, hex_part.len() / 2)?;
         } else {
             // Assume base58 - basic character validation
-            if !address.chars().all(|c| c.is_ascii_alphanumeric() && !"0OIl".contains(c)) {
+            if !address
+                .chars()
+                .all(|c| c.is_ascii_alphanumeric() && !"0OIl".contains(c))
+            {
                 return Err(KalaError::validation("Invalid address format"));
             }
         }
@@ -211,8 +218,7 @@ impl ValidationUtils {
     ) -> KalaResult<T> {
         if value < min || value > max {
             return Err(KalaError::validation(format!(
-                "{} out of range (min: {:?}, max: {:?})",
-                field_name, min, max
+                "{field_name} out of range (min: {min:?}, max: {max:?})"
             )));
         }
         Ok(value)
@@ -225,7 +231,7 @@ impl ValidationUtils {
     {
         for (i, item) in items.iter().enumerate() {
             validator(item)
-                .map_err(|e| KalaError::validation(format!("{}[{}]: {}", field_name, i, e)))?;
+                .map_err(|e| KalaError::validation(format!("{field_name}[{i}]: {e}")))?;
         }
         Ok(())
     }

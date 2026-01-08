@@ -1,7 +1,7 @@
 //kala-transaction/src/types.rs
 use kala_common::{
     error::{KalaError, KalaResult},
-    types::{Hash, IterationNumber, PublicKey, Signature, TickNumber, Timestamp},
+    types::{IterationNumber, TickNumber, Timestamp},
 };
 use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, Bytes};
@@ -115,6 +115,7 @@ impl Solve {
 
 // Transaction enum
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[allow(clippy::large_enum_variant)]
 pub enum Transaction {
     Send(Send),
     Mint(Mint),

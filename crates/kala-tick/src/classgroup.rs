@@ -2,12 +2,10 @@
 use crate::discriminant::Discriminant;
 use crate::form::QuadraticForm;
 use kala_common::{error::CVDFError, error::KalaError, prelude::KalaResult};
-use rug::ops::DivRounding;
 use rug::rand::RandState;
 use rug::Integer;
 use std::cmp::min;
 use std::ops::Neg;
-use tracing::debug;
 
 /// Class group operations
 pub struct ClassGroup {
@@ -47,6 +45,7 @@ impl ClassGroup {
     }
 
     /// Partial XGCD - computes partial extended GCD
+    #[allow(non_snake_case)]
     fn xgcd_partial(
         r2: &Integer,
         r1: &Integer,
@@ -85,10 +84,8 @@ impl ClassGroup {
                     if t1 < -t3 || rr1_mut - t1 < t2 - aa1 {
                         break;
                     }
-                } else {
-                    if t1 < -t2 || rr1_mut - t1 < t3 - bb1 {
-                        break;
-                    }
+                } else if t1 < -t2 || rr1_mut - t1 < t3 - bb1 {
+                    break;
                 }
 
                 rr2_mut = rr1_mut;
@@ -159,6 +156,7 @@ impl ClassGroup {
     }
 
     /// Compose two quadratic forms using NUCOMP algorithm
+    #[allow(non_snake_case)]
     pub fn compose(&self, f1: &QuadraticForm, f2: &QuadraticForm) -> KalaResult<QuadraticForm> {
         if !f1.is_valid(&self.discriminant) || !f2.is_valid(&self.discriminant) {
             return Err(KalaError::CVDFError(CVDFError::InvalidForm));
@@ -178,7 +176,7 @@ impl ClassGroup {
         let a2 = &g.a;
         let b1 = &f.b;
         let b2 = &g.b;
-        let c1 = &f.c;
+        let _c1 = &f.c;
         let c2 = &g.c;
 
         let ss = Integer::from(b1 + b2) / 2;
@@ -196,42 +194,41 @@ impl ClassGroup {
 
         if sp != 1 {
             let (s, v2, u2) = Self::extended_gcd(&ss, &sp);
-            k = Integer::from(Integer::from(&k * &u2) - Integer::from(&v2 * c2));
+            k = Integer::from(&k * &u2) - Integer::from(&v2 * c2);
             if s != 1 {
                 let a1_new = Integer::from(a1 / &s);
                 let a2_new = Integer::from(a2 / &s);
                 let c2_new = Integer::from(c2 * &s);
-                k = k % &a1_new;
+                k %= &a1_new;
                 // Update for use in computation
-                let a1 = a1_new;
-                let a2 = a2_new;
-                let c2 = c2_new;
+                let _a1 = a1_new;
+                let _a2 = a2_new;
+                let _c2 = c2_new;
             } else {
-                k = k % a1;
+                k %= a1;
             }
         }
 
         let disc_abs = Integer::from(self.discriminant.value.abs_ref());
         let L = Integer::from(disc_abs.sqrt_ref()) / 2;
 
-        let (ca, cb, cc) = if a1 < &L {
+        let (ca, cb, _cc) = if a1 < &L {
             let t = Integer::from(a2 * &k);
             let ca = Integer::from(a2 * a1);
             let cb = Integer::from(&t * 2) + b2;
-            let cc: Integer = Integer::from(Integer::from(b2 + &t) * &k + c2) / a1;
+            let cc: Integer = (Integer::from(b2 + &t) * &k + c2) / a1;
             (ca, cb, cc)
         } else {
-            let (co2, co1, r2, r1) = Self::xgcd_partial(a1, &k, &L);
-            let m1 = Integer::from(Integer::from(&m * &co1) + Integer::from(a2 * &r1)) / a1;
-            let m2 = Integer::from(&ss * &r1 - Integer::from(c2 * &co1)) / a1;
+            let (co2, co1, _r2, r1) = Self::xgcd_partial(a1, &k, &L);
+            let m1 = (Integer::from(&m * &co1) + Integer::from(a2 * &r1)) / a1;
+            let m2 = (&ss * &r1 - Integer::from(c2 * &co1)) / a1;
             let ca = if co1 < 0 {
-                Integer::from(&r1 * &m1 - Integer::from(&co1 * &m2))
+                &r1 * &m1 - Integer::from(&co1 * &m2)
             } else {
-                Integer::from(&co1 * &m2 - Integer::from(&r1 * &m1))
+                &co1 * &m2 - Integer::from(&r1 * &m1)
             };
             let t = Integer::from(a2 * &k);
-            let cb_temp =
-                Integer::from(Integer::from(&t - Integer::from(&ca * &co2)) * 2 / &co1 - b2);
+            let cb_temp = (&t - Integer::from(&ca * &co2)) * 2 / &co1 - b2;
             let two_ca = Integer::from(&ca * 2);
             let cb = cb_temp % &two_ca;
             let cc: Integer = Integer::from(&cb * &cb - &self.discriminant.value) / &ca / 4;
@@ -244,8 +241,8 @@ impl ClassGroup {
 
         let mut b3 = cb;
         let two_ca = Integer::from(&ca * 2);
-        b3 = b3 % &two_ca;
-        if &b3 > &ca {
+        b3 %= &two_ca;
+        if b3 > ca {
             b3 -= &two_ca;
         }
 
@@ -262,6 +259,7 @@ impl ClassGroup {
     }
 
     /// Square a quadratic form using NUDUPL algorithm
+    #[allow(non_snake_case)]
     pub fn square(&self, form: &QuadraticForm) -> KalaResult<QuadraticForm> {
         if !form.is_valid(&self.discriminant) {
             return Err(KalaError::CVDFError(CVDFError::InvalidForm));
@@ -284,16 +282,16 @@ impl ClassGroup {
             (s, v)
         };
 
-        let mut k = Integer::from(Integer::from(&v2 * c1).neg());
+        let mut k = Integer::from(&v2 * c1).neg();
         let mut a1_new = a1.clone();
         let mut c1_new = c1.clone();
 
         if s != 1 {
             a1_new = Integer::from(a1 / &s);
             c1_new = Integer::from(c1 * &s);
-            k = k % &a1_new;
+            k %= &a1_new;
         } else {
-            k = k % a1;
+            k %= a1;
         }
         if k < 0 {
             k += &a1_new;
@@ -302,22 +300,20 @@ impl ClassGroup {
         let disc_abs = Integer::from(self.discriminant.value.abs_ref());
         let L = Integer::from(disc_abs.sqrt_ref()) / 2;
 
-        let (ca, cb, cc) = if a1_new < L {
+        let (ca, cb, _cc) = if a1_new < L {
             let t = Integer::from(&a1_new * &k);
             let ca = Integer::from(&a1_new * &a1_new);
             let cb = Integer::from(&t * 2) + b;
-            let cc: Integer = Integer::from(Integer::from(b + &t) * &k + &c1_new) / &a1_new;
+            let cc: Integer = (Integer::from(b + &t) * &k + &c1_new) / &a1_new;
             (ca, cb, cc)
         } else {
-            let (co2, co1, r2, r1) = Self::xgcd_partial(&a1_new, &k, &L);
-            let m2 = Integer::from(b * &r1 - Integer::from(&c1_new * &co1)) / &a1_new;
-            let mut ca = Integer::from(&r1 * &r1 - Integer::from(&co1 * &m2));
+            let (co2, co1, _r2, r1) = Self::xgcd_partial(&a1_new, &k, &L);
+            let m2 = (b * &r1 - Integer::from(&c1_new * &co1)) / &a1_new;
+            let mut ca = &r1 * &r1 - Integer::from(&co1 * &m2);
             if co1 >= 0 {
                 ca = -ca;
             }
-            let cb_temp = Integer::from(
-                Integer::from(&a1_new * &r1 - Integer::from(&ca * &co2)) * 2 / &co1 - b,
-            );
+            let cb_temp = (&a1_new * &r1 - Integer::from(&ca * &co2)) * 2 / &co1 - b;
             let two_ca = Integer::from(ca.abs_ref()) * 2;
             let cb = cb_temp % &two_ca;
             let cc: Integer = Integer::from(&cb * &cb - &self.discriminant.value) / &ca / 4;
@@ -330,8 +326,8 @@ impl ClassGroup {
 
         let mut b_new = cb;
         let two_ca = Integer::from(&ca * 2);
-        b_new = b_new % &two_ca;
-        if &b_new > &ca {
+        b_new %= &two_ca;
+        if b_new > ca {
             b_new -= &two_ca;
         }
 
@@ -421,7 +417,10 @@ mod tests {
 
     #[test]
     fn test_compose_identity() {
-        let disc = Discriminant { value: Integer::from(-23), bit_length: 6 };
+        let disc = Discriminant {
+            value: Integer::from(-23),
+            bit_length: 6,
+        };
         let cg = ClassGroup::new(disc.clone());
         let identity = QuadraticForm::identity(&disc);
         let form = QuadraticForm::new(Integer::from(2), Integer::from(1), Integer::from(3));
@@ -433,23 +432,34 @@ mod tests {
 
     #[test]
     fn test_square() {
-        let disc = Discriminant { value: Integer::from(-23), bit_length: 6 };
+        let disc = Discriminant {
+            value: Integer::from(-23),
+            bit_length: 6,
+        };
         let cg = ClassGroup::new(disc.clone());
         let form = QuadraticForm::new(Integer::from(2), Integer::from(1), Integer::from(3));
         let form = form.reduce();
         let squared = cg.square(&form).expect("Square should succeed");
         let composed = cg.compose(&form, &form).expect("Compose should succeed");
-        assert_eq!(squared.reduce(), composed.reduce(), "Reduced forms should match");
+        assert_eq!(
+            squared.reduce(),
+            composed.reduce(),
+            "Reduced forms should match"
+        );
         assert_eq!(squared.discriminant(), disc.value);
     }
 
     #[test]
     fn test_repeated_squaring() {
-        let disc = Discriminant { value: Integer::from(-23), bit_length: 6 };
+        let disc = Discriminant {
+            value: Integer::from(-23),
+            bit_length: 6,
+        };
         let cg = ClassGroup::new(disc.clone());
         let form = QuadraticForm::new(Integer::from(2), Integer::from(1), Integer::from(3));
-        let form_4_method1 =
-            cg.repeated_squaring(&form, 2).expect("Repeated squaring should succeed");
+        let form_4_method1 = cg
+            .repeated_squaring(&form, 2)
+            .expect("Repeated squaring should succeed");
         let form_2 = cg.square(&form).expect("Square should succeed");
         let form_4_method2 = cg.square(&form_2).expect("Square should succeed");
         assert_eq!(form_4_method1.discriminant(), form_4_method2.discriminant());
@@ -458,20 +468,32 @@ mod tests {
 
     #[test]
     fn test_pow() {
-        let disc = Discriminant { value: Integer::from(-23), bit_length: 6 };
+        let disc = Discriminant {
+            value: Integer::from(-23),
+            bit_length: 6,
+        };
         let cg = ClassGroup::new(disc.clone());
         let form = QuadraticForm::new(Integer::from(2), Integer::from(1), Integer::from(3));
-        let result = cg.pow(&form, &Integer::from(0)).expect("Power should succeed");
+        let result = cg
+            .pow(&form, &Integer::from(0))
+            .expect("Power should succeed");
         assert_eq!(result, QuadraticForm::identity(&disc));
-        let result = cg.pow(&form, &Integer::from(1)).expect("Power should succeed");
+        let result = cg
+            .pow(&form, &Integer::from(1))
+            .expect("Power should succeed");
         assert_eq!(result, form.reduce());
-        let result = cg.pow(&form, &Integer::from(4)).expect("Power should succeed");
+        let result = cg
+            .pow(&form, &Integer::from(4))
+            .expect("Power should succeed");
         assert_eq!(result.discriminant(), disc.value);
     }
 
     #[test]
     fn test_random_element() {
-        let disc = Discriminant { value: Integer::from(-23), bit_length: 6 };
+        let disc = Discriminant {
+            value: Integer::from(-23),
+            bit_length: 6,
+        };
         let cg = ClassGroup::new(disc.clone());
         let form = cg.random_element().expect("Random element should succeed");
         assert_eq!(form.discriminant(), disc.value);
@@ -480,7 +502,10 @@ mod tests {
 
     #[test]
     fn test_associativity() {
-        let disc = Discriminant { value: Integer::from(-23), bit_length: 6 };
+        let disc = Discriminant {
+            value: Integer::from(-23),
+            bit_length: 6,
+        };
         let cg = ClassGroup::new(disc);
         let f1 = QuadraticForm::new(Integer::from(2), Integer::from(1), Integer::from(3));
         let f2 = QuadraticForm::new(Integer::from(3), Integer::from(1), Integer::from(2));
@@ -497,7 +522,10 @@ mod tests {
     #[test]
     fn test_compose_chia_prod_discriminant() {
         let disc_value = Integer::from_str_radix("-3fe0000000000000000f", 16).unwrap();
-        let disc = Discriminant { value: disc_value.clone(), bit_length: 67 };
+        let disc = Discriminant {
+            value: disc_value.clone(),
+            bit_length: 67,
+        };
         let cg = ClassGroup::new(disc.clone());
         let f1 = QuadraticForm::identity(&disc);
         let f2 = cg.random_element().expect("Random element should succeed");

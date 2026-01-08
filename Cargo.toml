@@ -126,7 +126,7 @@ missing_debug_implementations = "warn"
 missing_docs = "warn"
 
 # Code quality
-rust_2018_idioms = "deny"
+rust_2018_idioms = { level = "deny", priority = -1 }
 trivial_casts = "warn"
 trivial_numeric_casts = "warn"
 unused_lifetimes = "warn"
