@@ -77,14 +77,14 @@ impl KalaDatabase {
         opts.set_compaction_style(rocksdb::DBCompactionStyle::Universal);
 
         let db = DB::open(&opts, path)
-            .map_err(|e| KalaError::database(format!("Failed to open database: {}", e)))?;
+            .map_err(|e| KalaError::database(format!("Failed to open database: {e}")))?;
 
         Ok(Self { db: Arc::new(db) })
     }
 
     /// Format key with prefix
     fn format_key(prefix: &str, key: &str) -> String {
-        format!("{}:{}", prefix, key)
+        format!("{prefix}:{key}")
     }
 
     /// Get raw value from database
@@ -146,12 +146,13 @@ impl DatabaseOps for KalaDatabase {
 
     async fn get_keys_with_prefix(&self, prefix: &str) -> KalaResult<Vec<String>> {
         let mut keys = Vec::new();
-        let prefix_with_separator = format!("{}:", prefix);
+        let prefix_with_separator = format!("{prefix}:");
         let prefix_bytes = prefix_with_separator.as_bytes();
 
-        let iter = self
-            .db
-            .iterator(rocksdb::IteratorMode::From(prefix_bytes, rocksdb::Direction::Forward));
+        let iter = self.db.iterator(rocksdb::IteratorMode::From(
+            prefix_bytes,
+            rocksdb::Direction::Forward,
+        ));
 
         for item in iter {
             let (key, _) = item.map_err(KalaError::from)?;
@@ -191,7 +192,7 @@ impl TypedDatabaseOps for KalaDatabase {
         data: &T,
     ) -> KalaResult<()> {
         let bytes = bincode::serialize(data)
-            .map_err(|e| KalaError::serialization(format!("Failed to serialize data: {}", e)))?;
+            .map_err(|e| KalaError::serialization(format!("Failed to serialize data: {e}")))?;
         self.store_data(prefix, key, &bytes).await
     }
 
@@ -203,7 +204,7 @@ impl TypedDatabaseOps for KalaDatabase {
         match self.load_data(prefix, key).await? {
             Some(bytes) => {
                 let data = bincode::deserialize(&bytes).map_err(|e| {
-                    KalaError::serialization(format!("Failed to deserialize data: {}", e))
+                    KalaError::serialization(format!("Failed to deserialize data: {e}"))
                 })?;
                 Ok(Some(data))
             }
@@ -219,7 +220,7 @@ impl TypedDatabaseOps for KalaDatabase {
 
         for (prefix, key, data) in operations {
             let bytes = bincode::serialize(&data).map_err(|e| {
-                KalaError::serialization(format!("Failed to serialize batch data: {}", e))
+                KalaError::serialization(format!("Failed to serialize batch data: {e}"))
             })?;
             byte_operations.push((prefix, key, bytes));
         }
@@ -231,10 +232,15 @@ impl TypedDatabaseOps for KalaDatabase {
 /// Database configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DatabaseConfig {
+    /// Path to the database directory
     pub path: String,
+    /// Cache size in megabytes
     pub cache_size_mb: usize,
+    /// Maximum number of open files
     pub max_open_files: i32,
+    /// Write buffer size in bytes
     pub write_buffer_size: usize,
+    /// Block cache size in megabytes
     pub block_cache_size_mb: usize,
 }
 
@@ -284,7 +290,11 @@ impl DatabaseUtils {
     pub fn restore_database(backup_path: &str, restore_path: &str) -> KalaResult<()> {
         // This would require additional rocksdb backup functionality
         // For now, just return success
-        tracing::info!("Database restore requested from: {} to: {}", backup_path, restore_path);
+        tracing::info!(
+            "Database restore requested from: {} to: {}",
+            backup_path,
+            restore_path
+        );
         Ok(())
     }
 }
@@ -307,7 +317,10 @@ mod tests {
         let db_path = temp_dir.path().join("test_db");
         let db = KalaDatabase::new(db_path.to_str().unwrap()).unwrap();
 
-        let test_data = TestData { id: 123, name: "test".to_string() };
+        let test_data = TestData {
+            id: 123,
+            name: "test".to_string(),
+        };
 
         // Test store typed
         db.store_typed("test", "key1", &test_data).await.unwrap();
@@ -361,17 +374,37 @@ mod tests {
         let db = KalaDatabase::new(db_path.to_str().unwrap()).unwrap();
 
         let operations = vec![
-            ("test".to_string(), "key1".to_string(), TestData { id: 1, name: "one".to_string() }),
-            ("test".to_string(), "key2".to_string(), TestData { id: 2, name: "two".to_string() }),
-            ("test".to_string(), "key3".to_string(), TestData { id: 3, name: "three".to_string() }),
+            (
+                "test".to_string(),
+                "key1".to_string(),
+                TestData {
+                    id: 1,
+                    name: "one".to_string(),
+                },
+            ),
+            (
+                "test".to_string(),
+                "key2".to_string(),
+                TestData {
+                    id: 2,
+                    name: "two".to_string(),
+                },
+            ),
+            (
+                "test".to_string(),
+                "key3".to_string(),
+                TestData {
+                    id: 3,
+                    name: "three".to_string(),
+                },
+            ),
         ];
 
         db.batch_store_typed(operations).await.unwrap();
 
         // Verify all data was stored
         for i in 1..=3 {
-            let loaded: Option<TestData> =
-                db.load_typed("test", &format!("key{}", i)).await.unwrap();
+            let loaded: Option<TestData> = db.load_typed("test", &format!("key{i}")).await.unwrap();
             assert!(loaded.is_some());
             assert_eq!(loaded.unwrap().id, i as u64);
         }
@@ -383,7 +416,10 @@ mod tests {
         let db_path = temp_dir.path().join("prefix_test_db");
         let db = KalaDatabase::new(db_path.to_str().unwrap()).unwrap();
 
-        let test_data = TestData { id: 1, name: "test".to_string() };
+        let test_data = TestData {
+            id: 1,
+            name: "test".to_string(),
+        };
 
         // Store data with different prefixes
         db.store_typed("prefix1", "key1", &test_data).await.unwrap();

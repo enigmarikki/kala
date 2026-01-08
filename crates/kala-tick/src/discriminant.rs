@@ -56,7 +56,10 @@ impl Discriminant {
             }
         }
 
-        Ok(Discriminant { value: d, bit_length: bits })
+        Ok(Discriminant {
+            value: d,
+            bit_length: bits,
+        })
     }
 
     /// Create from a specific value (for testing or known discriminants)
@@ -110,7 +113,7 @@ mod integer_serde {
     {
         let s = String::deserialize(deserializer)?;
         Integer::from_str_radix(&s, 16)
-            .map_err(|e| serde::de::Error::custom(format!("Invalid integer: {}", e)))
+            .map_err(|e| serde::de::Error::custom(format!("Invalid integer: {e}")))
     }
 }
 
@@ -170,7 +173,7 @@ mod tests {
 
         // Check it's approximately 1024 bits
         let bits = disc.value.significant_bits();
-        assert!(bits >= 1023 && bits <= 1024);
+        assert!((1023..=1024).contains(&bits));
     }
 
     #[test]

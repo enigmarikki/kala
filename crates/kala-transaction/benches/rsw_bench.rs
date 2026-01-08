@@ -1,9 +1,9 @@
-use criterion::{
-    black_box, criterion_group, criterion_main, BatchSize, BenchmarkId, Criterion, Throughput,
-};
+#![allow(dead_code, unused_variables)]
+
+use criterion::{criterion_group, criterion_main, BatchSize, BenchmarkId, Criterion, Throughput};
 use kala_transaction::types::{Burn, Mint, Send, Stake, Transaction, Unstake, AES_KEY_SIZE};
 use kala_transaction::*;
-use std::sync::Arc;
+use std::hint::black_box;
 use std::time::Duration;
 
 const PROTOCOL_HARDNESS: u32 = 65536;
@@ -105,8 +105,8 @@ fn bench_rsw_with_protocol_constants(c: &mut Criterion) {
 
     let timelock = RSWTimelock::new(PROTOCOL_MODULUS_BITS).unwrap();
     println!("GPU Device: {}", timelock.device_name());
-    println!("Protocol Hardness: {}", PROTOCOL_HARDNESS);
-    println!("Protocol Modulus Bits: {}", PROTOCOL_MODULUS_BITS);
+    println!("Protocol Hardness: {PROTOCOL_HARDNESS}");
+    println!("Protocol Modulus Bits: {PROTOCOL_MODULUS_BITS}");
 
     let key = [42u8; AES_KEY_SIZE];
 
@@ -164,7 +164,7 @@ fn bench_batch_processing(c: &mut Criterion) {
     let timelock = RSWTimelock::new(PROTOCOL_MODULUS_BITS).unwrap();
     let optimal_batch = timelock.optimal_batch_size();
 
-    println!("Optimal GPU Batch Size: {}", optimal_batch);
+    println!("Optimal GPU Batch Size: {optimal_batch}");
 
     // Test various batch sizes to find actual optimal performance
     let batch_sizes = [
@@ -277,7 +277,7 @@ fn bench_full_batch_pipeline(c: &mut Criterion) {
                             .iter()
                             .enumerate()
                             .map(|(i, tx)| {
-                                create_timelock_transaction(tx, &ctx, 500 + i as u64).unwrap()
+                                create_timelock_transaction(tx, &ctx, 500 + i as u128).unwrap()
                             })
                             .collect::<Vec<_>>()
                     },
@@ -386,7 +386,7 @@ fn bench_throughput_analysis(c: &mut Criterion) {
                         let _ = create_timelock_transaction(
                             black_box(tx),
                             black_box(&ctx),
-                            black_box(500 + i as u64),
+                            black_box(500 + i as u128),
                         );
                     }
                 })
@@ -409,8 +409,8 @@ fn bench_gpu_utilization(c: &mut Criterion) {
 
     println!("\n=== GPU Utilization Analysis ===");
     println!("Device: {}", timelock.device_name());
-    println!("Optimal Batch Size: {}", optimal_batch);
-    println!("Protocol Hardness: {}", PROTOCOL_HARDNESS);
+    println!("Optimal Batch Size: {optimal_batch}");
+    println!("Protocol Hardness: {PROTOCOL_HARDNESS}");
 
     // Test GPU efficiency at different utilization levels
     let utilization_levels = [
@@ -489,25 +489,29 @@ fn bench_memory_usage(c: &mut Criterion) {
     let batch_sizes = [10, 50, 100, 500];
 
     for size in batch_sizes {
-        group.bench_with_input(BenchmarkId::new("batch_memory", size), &size, |b, &batch_size| {
-            b.iter(|| {
-                let transactions = create_test_transactions(batch_size);
-                let mut total_size = 0;
+        group.bench_with_input(
+            BenchmarkId::new("batch_memory", size),
+            &size,
+            |b, &batch_size| {
+                b.iter(|| {
+                    let transactions = create_test_transactions(batch_size);
+                    let mut total_size = 0;
 
-                for (i, tx) in transactions.iter().enumerate() {
-                    let timelock_tx =
-                        create_timelock_transaction(tx, &ctx, 500 + i as u64).unwrap();
+                    for (i, tx) in transactions.iter().enumerate() {
+                        let timelock_tx =
+                            create_timelock_transaction(tx, &ctx, 500 + i as u128).unwrap();
 
-                    total_size += std::mem::size_of_val(&timelock_tx)
-                        + timelock_tx.encrypted_data.ciphertext.len()
-                        + timelock_tx.puzzle.n.len()
-                        + timelock_tx.puzzle.a.len()
-                        + timelock_tx.puzzle.puzzle_value.len();
-                }
+                        total_size += std::mem::size_of_val(&timelock_tx)
+                            + timelock_tx.encrypted_data.ciphertext.len()
+                            + timelock_tx.puzzle.n.len()
+                            + timelock_tx.puzzle.a.len()
+                            + timelock_tx.puzzle.puzzle_value.len();
+                    }
 
-                total_size
-            })
-        });
+                    total_size
+                })
+            },
+        );
     }
 
     group.finish();
@@ -549,7 +553,7 @@ fn bench_parallel_processing(c: &mut Criterion) {
                                 let _ = create_timelock_transaction(
                                     &txs[j],
                                     &ctx_clone,
-                                    500 + j as u64,
+                                    500 + j as u128,
                                 );
                             }
                         });
@@ -587,7 +591,7 @@ fn bench_real_world_scenarios(c: &mut Criterion) {
                 let mut timelock_txs = Vec::new();
                 for (i, tx) in transactions.iter().enumerate() {
                     let timelock_tx =
-                        create_timelock_transaction(tx, &ctx, 5000 + i as u64).unwrap();
+                        create_timelock_transaction(tx, &ctx, 5000 + i as u128).unwrap();
                     timelock_txs.push(timelock_tx);
                 }
 
@@ -611,7 +615,9 @@ fn bench_real_world_scenarios(c: &mut Criterion) {
                 transactions
                     .iter()
                     .enumerate()
-                    .map(|(i, tx)| create_timelock_transaction(tx, &ctx, 10000 + i as u64).unwrap())
+                    .map(|(i, tx)| {
+                        create_timelock_transaction(tx, &ctx, 10000 + i as u128).unwrap()
+                    })
                     .collect::<Vec<_>>()
             },
             |timelock_txs| decrypt_timelock_batch(black_box(&timelock_txs)),
@@ -636,7 +642,8 @@ fn bench_real_world_scenarios(c: &mut Criterion) {
                     let mut timelock_txs = Vec::new();
                     for (i, tx) in transactions.iter().take(10).enumerate() {
                         let timelock_tx =
-                            create_timelock_transaction(tx, &ctx, (idx * 1000 + i) as u64).unwrap();
+                            create_timelock_transaction(tx, &ctx, (idx * 1000 + i) as u128)
+                                .unwrap();
                         timelock_txs.push(timelock_tx);
                     }
 

@@ -8,7 +8,13 @@ use core::mem;
 extern crate flatbuffers;
 use self::flatbuffers::{EndianScalar, Follow};
 
-#[allow(unused_imports, dead_code)]
+#[allow(
+    unused_imports,
+    dead_code,
+    clippy::large_enum_variant,
+    clippy::extra_unused_lifetimes,
+    clippy::missing_safety_doc
+)]
 pub mod tx {
 
     use core::cmp::Ordering;
@@ -145,7 +151,9 @@ pub mod tx {
         type Inner = SendTx<'a>;
         #[inline]
         unsafe fn follow(buf: &'a [u8], loc: usize) -> Self::Inner {
-            Self { _tab: flatbuffers::Table::new(buf, loc) }
+            Self {
+                _tab: flatbuffers::Table::new(buf, loc),
+            }
         }
     }
 
@@ -199,10 +207,11 @@ pub mod tx {
             // Created from valid Table for this object
             // which contains a valid value in this slot
             unsafe {
-                self._tab.get::<flatbuffers::ForwardsUOffset<flatbuffers::Vector<'a, u8>>>(
-                    SendTx::VT_SENDER,
-                    None,
-                )
+                self._tab
+                    .get::<flatbuffers::ForwardsUOffset<flatbuffers::Vector<'a, u8>>>(
+                        SendTx::VT_SENDER,
+                        None,
+                    )
             }
         }
         #[inline]
@@ -211,10 +220,11 @@ pub mod tx {
             // Created from valid Table for this object
             // which contains a valid value in this slot
             unsafe {
-                self._tab.get::<flatbuffers::ForwardsUOffset<flatbuffers::Vector<'a, u8>>>(
-                    SendTx::VT_RECEIVER,
-                    None,
-                )
+                self._tab
+                    .get::<flatbuffers::ForwardsUOffset<flatbuffers::Vector<'a, u8>>>(
+                        SendTx::VT_RECEIVER,
+                        None,
+                    )
             }
         }
         #[inline]
@@ -223,10 +233,11 @@ pub mod tx {
             // Created from valid Table for this object
             // which contains a valid value in this slot
             unsafe {
-                self._tab.get::<flatbuffers::ForwardsUOffset<flatbuffers::Vector<'a, u8>>>(
-                    SendTx::VT_DENOM,
-                    None,
-                )
+                self._tab
+                    .get::<flatbuffers::ForwardsUOffset<flatbuffers::Vector<'a, u8>>>(
+                        SendTx::VT_DENOM,
+                        None,
+                    )
             }
         }
         #[inline]
@@ -249,10 +260,11 @@ pub mod tx {
             // Created from valid Table for this object
             // which contains a valid value in this slot
             unsafe {
-                self._tab.get::<flatbuffers::ForwardsUOffset<flatbuffers::Vector<'a, u8>>>(
-                    SendTx::VT_SIGNATURE,
-                    None,
-                )
+                self._tab
+                    .get::<flatbuffers::ForwardsUOffset<flatbuffers::Vector<'a, u8>>>(
+                        SendTx::VT_SIGNATURE,
+                        None,
+                    )
             }
         }
         #[inline]
@@ -261,10 +273,11 @@ pub mod tx {
             // Created from valid Table for this object
             // which contains a valid value in this slot
             unsafe {
-                self._tab.get::<flatbuffers::ForwardsUOffset<flatbuffers::Vector<'a, u8>>>(
-                    SendTx::VT_GAS_SPONSORER,
-                    None,
-                )
+                self._tab
+                    .get::<flatbuffers::ForwardsUOffset<flatbuffers::Vector<'a, u8>>>(
+                        SendTx::VT_GAS_SPONSORER,
+                        None,
+                    )
             }
         }
     }
@@ -339,18 +352,21 @@ pub mod tx {
     impl<'a: 'b, 'b, A: flatbuffers::Allocator + 'a> SendTxBuilder<'a, 'b, A> {
         #[inline]
         pub fn add_sender(&mut self, sender: flatbuffers::WIPOffset<flatbuffers::Vector<'b, u8>>) {
-            self.fbb_.push_slot_always::<flatbuffers::WIPOffset<_>>(SendTx::VT_SENDER, sender);
+            self.fbb_
+                .push_slot_always::<flatbuffers::WIPOffset<_>>(SendTx::VT_SENDER, sender);
         }
         #[inline]
         pub fn add_receiver(
             &mut self,
             receiver: flatbuffers::WIPOffset<flatbuffers::Vector<'b, u8>>,
         ) {
-            self.fbb_.push_slot_always::<flatbuffers::WIPOffset<_>>(SendTx::VT_RECEIVER, receiver);
+            self.fbb_
+                .push_slot_always::<flatbuffers::WIPOffset<_>>(SendTx::VT_RECEIVER, receiver);
         }
         #[inline]
         pub fn add_denom(&mut self, denom: flatbuffers::WIPOffset<flatbuffers::Vector<'b, u8>>) {
-            self.fbb_.push_slot_always::<flatbuffers::WIPOffset<_>>(SendTx::VT_DENOM, denom);
+            self.fbb_
+                .push_slot_always::<flatbuffers::WIPOffset<_>>(SendTx::VT_DENOM, denom);
         }
         #[inline]
         pub fn add_amount(&mut self, amount: u64) {
@@ -383,7 +399,10 @@ pub mod tx {
             _fbb: &'b mut flatbuffers::FlatBufferBuilder<'a, A>,
         ) -> SendTxBuilder<'a, 'b, A> {
             let start = _fbb.start_table();
-            SendTxBuilder { fbb_: _fbb, start_: start }
+            SendTxBuilder {
+                fbb_: _fbb,
+                start_: start,
+            }
         }
         #[inline]
         pub fn finish(self) -> flatbuffers::WIPOffset<SendTx<'a>> {
@@ -416,7 +435,9 @@ pub mod tx {
         type Inner = MintTx<'a>;
         #[inline]
         unsafe fn follow(buf: &'a [u8], loc: usize) -> Self::Inner {
-            Self { _tab: flatbuffers::Table::new(buf, loc) }
+            Self {
+                _tab: flatbuffers::Table::new(buf, loc),
+            }
         }
     }
 
@@ -466,10 +487,11 @@ pub mod tx {
             // Created from valid Table for this object
             // which contains a valid value in this slot
             unsafe {
-                self._tab.get::<flatbuffers::ForwardsUOffset<flatbuffers::Vector<'a, u8>>>(
-                    MintTx::VT_SENDER,
-                    None,
-                )
+                self._tab
+                    .get::<flatbuffers::ForwardsUOffset<flatbuffers::Vector<'a, u8>>>(
+                        MintTx::VT_SENDER,
+                        None,
+                    )
             }
         }
         #[inline]
@@ -485,10 +507,11 @@ pub mod tx {
             // Created from valid Table for this object
             // which contains a valid value in this slot
             unsafe {
-                self._tab.get::<flatbuffers::ForwardsUOffset<flatbuffers::Vector<'a, u8>>>(
-                    MintTx::VT_DENOM,
-                    None,
-                )
+                self._tab
+                    .get::<flatbuffers::ForwardsUOffset<flatbuffers::Vector<'a, u8>>>(
+                        MintTx::VT_DENOM,
+                        None,
+                    )
             }
         }
         #[inline]
@@ -504,10 +527,11 @@ pub mod tx {
             // Created from valid Table for this object
             // which contains a valid value in this slot
             unsafe {
-                self._tab.get::<flatbuffers::ForwardsUOffset<flatbuffers::Vector<'a, u8>>>(
-                    MintTx::VT_SIGNATURE,
-                    None,
-                )
+                self._tab
+                    .get::<flatbuffers::ForwardsUOffset<flatbuffers::Vector<'a, u8>>>(
+                        MintTx::VT_SIGNATURE,
+                        None,
+                    )
             }
         }
         #[inline]
@@ -516,10 +540,11 @@ pub mod tx {
             // Created from valid Table for this object
             // which contains a valid value in this slot
             unsafe {
-                self._tab.get::<flatbuffers::ForwardsUOffset<flatbuffers::Vector<'a, u8>>>(
-                    MintTx::VT_GAS_SPONSORER,
-                    None,
-                )
+                self._tab
+                    .get::<flatbuffers::ForwardsUOffset<flatbuffers::Vector<'a, u8>>>(
+                        MintTx::VT_GAS_SPONSORER,
+                        None,
+                    )
             }
         }
     }
@@ -587,7 +612,8 @@ pub mod tx {
     impl<'a: 'b, 'b, A: flatbuffers::Allocator + 'a> MintTxBuilder<'a, 'b, A> {
         #[inline]
         pub fn add_sender(&mut self, sender: flatbuffers::WIPOffset<flatbuffers::Vector<'b, u8>>) {
-            self.fbb_.push_slot_always::<flatbuffers::WIPOffset<_>>(MintTx::VT_SENDER, sender);
+            self.fbb_
+                .push_slot_always::<flatbuffers::WIPOffset<_>>(MintTx::VT_SENDER, sender);
         }
         #[inline]
         pub fn add_amount(&mut self, amount: u64) {
@@ -595,7 +621,8 @@ pub mod tx {
         }
         #[inline]
         pub fn add_denom(&mut self, denom: flatbuffers::WIPOffset<flatbuffers::Vector<'b, u8>>) {
-            self.fbb_.push_slot_always::<flatbuffers::WIPOffset<_>>(MintTx::VT_DENOM, denom);
+            self.fbb_
+                .push_slot_always::<flatbuffers::WIPOffset<_>>(MintTx::VT_DENOM, denom);
         }
         #[inline]
         pub fn add_nonce(&mut self, nonce: u64) {
@@ -624,7 +651,10 @@ pub mod tx {
             _fbb: &'b mut flatbuffers::FlatBufferBuilder<'a, A>,
         ) -> MintTxBuilder<'a, 'b, A> {
             let start = _fbb.start_table();
-            MintTxBuilder { fbb_: _fbb, start_: start }
+            MintTxBuilder {
+                fbb_: _fbb,
+                start_: start,
+            }
         }
         #[inline]
         pub fn finish(self) -> flatbuffers::WIPOffset<MintTx<'a>> {
@@ -656,7 +686,9 @@ pub mod tx {
         type Inner = BurnTx<'a>;
         #[inline]
         unsafe fn follow(buf: &'a [u8], loc: usize) -> Self::Inner {
-            Self { _tab: flatbuffers::Table::new(buf, loc) }
+            Self {
+                _tab: flatbuffers::Table::new(buf, loc),
+            }
         }
     }
 
@@ -706,10 +738,11 @@ pub mod tx {
             // Created from valid Table for this object
             // which contains a valid value in this slot
             unsafe {
-                self._tab.get::<flatbuffers::ForwardsUOffset<flatbuffers::Vector<'a, u8>>>(
-                    BurnTx::VT_SENDER,
-                    None,
-                )
+                self._tab
+                    .get::<flatbuffers::ForwardsUOffset<flatbuffers::Vector<'a, u8>>>(
+                        BurnTx::VT_SENDER,
+                        None,
+                    )
             }
         }
         #[inline]
@@ -725,10 +758,11 @@ pub mod tx {
             // Created from valid Table for this object
             // which contains a valid value in this slot
             unsafe {
-                self._tab.get::<flatbuffers::ForwardsUOffset<flatbuffers::Vector<'a, u8>>>(
-                    BurnTx::VT_DENOM,
-                    None,
-                )
+                self._tab
+                    .get::<flatbuffers::ForwardsUOffset<flatbuffers::Vector<'a, u8>>>(
+                        BurnTx::VT_DENOM,
+                        None,
+                    )
             }
         }
         #[inline]
@@ -744,10 +778,11 @@ pub mod tx {
             // Created from valid Table for this object
             // which contains a valid value in this slot
             unsafe {
-                self._tab.get::<flatbuffers::ForwardsUOffset<flatbuffers::Vector<'a, u8>>>(
-                    BurnTx::VT_SIGNATURE,
-                    None,
-                )
+                self._tab
+                    .get::<flatbuffers::ForwardsUOffset<flatbuffers::Vector<'a, u8>>>(
+                        BurnTx::VT_SIGNATURE,
+                        None,
+                    )
             }
         }
         #[inline]
@@ -756,10 +791,11 @@ pub mod tx {
             // Created from valid Table for this object
             // which contains a valid value in this slot
             unsafe {
-                self._tab.get::<flatbuffers::ForwardsUOffset<flatbuffers::Vector<'a, u8>>>(
-                    BurnTx::VT_GAS_SPONSORER,
-                    None,
-                )
+                self._tab
+                    .get::<flatbuffers::ForwardsUOffset<flatbuffers::Vector<'a, u8>>>(
+                        BurnTx::VT_GAS_SPONSORER,
+                        None,
+                    )
             }
         }
     }
@@ -827,7 +863,8 @@ pub mod tx {
     impl<'a: 'b, 'b, A: flatbuffers::Allocator + 'a> BurnTxBuilder<'a, 'b, A> {
         #[inline]
         pub fn add_sender(&mut self, sender: flatbuffers::WIPOffset<flatbuffers::Vector<'b, u8>>) {
-            self.fbb_.push_slot_always::<flatbuffers::WIPOffset<_>>(BurnTx::VT_SENDER, sender);
+            self.fbb_
+                .push_slot_always::<flatbuffers::WIPOffset<_>>(BurnTx::VT_SENDER, sender);
         }
         #[inline]
         pub fn add_amount(&mut self, amount: u64) {
@@ -835,7 +872,8 @@ pub mod tx {
         }
         #[inline]
         pub fn add_denom(&mut self, denom: flatbuffers::WIPOffset<flatbuffers::Vector<'b, u8>>) {
-            self.fbb_.push_slot_always::<flatbuffers::WIPOffset<_>>(BurnTx::VT_DENOM, denom);
+            self.fbb_
+                .push_slot_always::<flatbuffers::WIPOffset<_>>(BurnTx::VT_DENOM, denom);
         }
         #[inline]
         pub fn add_nonce(&mut self, nonce: u64) {
@@ -864,7 +902,10 @@ pub mod tx {
             _fbb: &'b mut flatbuffers::FlatBufferBuilder<'a, A>,
         ) -> BurnTxBuilder<'a, 'b, A> {
             let start = _fbb.start_table();
-            BurnTxBuilder { fbb_: _fbb, start_: start }
+            BurnTxBuilder {
+                fbb_: _fbb,
+                start_: start,
+            }
         }
         #[inline]
         pub fn finish(self) -> flatbuffers::WIPOffset<BurnTx<'a>> {
@@ -896,7 +937,9 @@ pub mod tx {
         type Inner = StakeTx<'a>;
         #[inline]
         unsafe fn follow(buf: &'a [u8], loc: usize) -> Self::Inner {
-            Self { _tab: flatbuffers::Table::new(buf, loc) }
+            Self {
+                _tab: flatbuffers::Table::new(buf, loc),
+            }
         }
     }
 
@@ -946,10 +989,11 @@ pub mod tx {
             // Created from valid Table for this object
             // which contains a valid value in this slot
             unsafe {
-                self._tab.get::<flatbuffers::ForwardsUOffset<flatbuffers::Vector<'a, u8>>>(
-                    StakeTx::VT_DELEGATOR,
-                    None,
-                )
+                self._tab
+                    .get::<flatbuffers::ForwardsUOffset<flatbuffers::Vector<'a, u8>>>(
+                        StakeTx::VT_DELEGATOR,
+                        None,
+                    )
             }
         }
         #[inline]
@@ -958,10 +1002,11 @@ pub mod tx {
             // Created from valid Table for this object
             // which contains a valid value in this slot
             unsafe {
-                self._tab.get::<flatbuffers::ForwardsUOffset<flatbuffers::Vector<'a, u8>>>(
-                    StakeTx::VT_WITNESS,
-                    None,
-                )
+                self._tab
+                    .get::<flatbuffers::ForwardsUOffset<flatbuffers::Vector<'a, u8>>>(
+                        StakeTx::VT_WITNESS,
+                        None,
+                    )
             }
         }
         #[inline]
@@ -984,10 +1029,11 @@ pub mod tx {
             // Created from valid Table for this object
             // which contains a valid value in this slot
             unsafe {
-                self._tab.get::<flatbuffers::ForwardsUOffset<flatbuffers::Vector<'a, u8>>>(
-                    StakeTx::VT_SIGNATURE,
-                    None,
-                )
+                self._tab
+                    .get::<flatbuffers::ForwardsUOffset<flatbuffers::Vector<'a, u8>>>(
+                        StakeTx::VT_SIGNATURE,
+                        None,
+                    )
             }
         }
         #[inline]
@@ -996,10 +1042,11 @@ pub mod tx {
             // Created from valid Table for this object
             // which contains a valid value in this slot
             unsafe {
-                self._tab.get::<flatbuffers::ForwardsUOffset<flatbuffers::Vector<'a, u8>>>(
-                    StakeTx::VT_GAS_SPONSORER,
-                    None,
-                )
+                self._tab
+                    .get::<flatbuffers::ForwardsUOffset<flatbuffers::Vector<'a, u8>>>(
+                        StakeTx::VT_GAS_SPONSORER,
+                        None,
+                    )
             }
         }
     }
@@ -1078,7 +1125,8 @@ pub mod tx {
             &mut self,
             witness: flatbuffers::WIPOffset<flatbuffers::Vector<'b, u8>>,
         ) {
-            self.fbb_.push_slot_always::<flatbuffers::WIPOffset<_>>(StakeTx::VT_WITNESS, witness);
+            self.fbb_
+                .push_slot_always::<flatbuffers::WIPOffset<_>>(StakeTx::VT_WITNESS, witness);
         }
         #[inline]
         pub fn add_amount(&mut self, amount: u64) {
@@ -1111,7 +1159,10 @@ pub mod tx {
             _fbb: &'b mut flatbuffers::FlatBufferBuilder<'a, A>,
         ) -> StakeTxBuilder<'a, 'b, A> {
             let start = _fbb.start_table();
-            StakeTxBuilder { fbb_: _fbb, start_: start }
+            StakeTxBuilder {
+                fbb_: _fbb,
+                start_: start,
+            }
         }
         #[inline]
         pub fn finish(self) -> flatbuffers::WIPOffset<StakeTx<'a>> {
@@ -1143,7 +1194,9 @@ pub mod tx {
         type Inner = UnstakeTx<'a>;
         #[inline]
         unsafe fn follow(buf: &'a [u8], loc: usize) -> Self::Inner {
-            Self { _tab: flatbuffers::Table::new(buf, loc) }
+            Self {
+                _tab: flatbuffers::Table::new(buf, loc),
+            }
         }
     }
 
@@ -1193,10 +1246,11 @@ pub mod tx {
             // Created from valid Table for this object
             // which contains a valid value in this slot
             unsafe {
-                self._tab.get::<flatbuffers::ForwardsUOffset<flatbuffers::Vector<'a, u8>>>(
-                    UnstakeTx::VT_DELEGATOR,
-                    None,
-                )
+                self._tab
+                    .get::<flatbuffers::ForwardsUOffset<flatbuffers::Vector<'a, u8>>>(
+                        UnstakeTx::VT_DELEGATOR,
+                        None,
+                    )
             }
         }
         #[inline]
@@ -1205,10 +1259,11 @@ pub mod tx {
             // Created from valid Table for this object
             // which contains a valid value in this slot
             unsafe {
-                self._tab.get::<flatbuffers::ForwardsUOffset<flatbuffers::Vector<'a, u8>>>(
-                    UnstakeTx::VT_WITNESS,
-                    None,
-                )
+                self._tab
+                    .get::<flatbuffers::ForwardsUOffset<flatbuffers::Vector<'a, u8>>>(
+                        UnstakeTx::VT_WITNESS,
+                        None,
+                    )
             }
         }
         #[inline]
@@ -1231,10 +1286,11 @@ pub mod tx {
             // Created from valid Table for this object
             // which contains a valid value in this slot
             unsafe {
-                self._tab.get::<flatbuffers::ForwardsUOffset<flatbuffers::Vector<'a, u8>>>(
-                    UnstakeTx::VT_SIGNATURE,
-                    None,
-                )
+                self._tab
+                    .get::<flatbuffers::ForwardsUOffset<flatbuffers::Vector<'a, u8>>>(
+                        UnstakeTx::VT_SIGNATURE,
+                        None,
+                    )
             }
         }
         #[inline]
@@ -1243,10 +1299,11 @@ pub mod tx {
             // Created from valid Table for this object
             // which contains a valid value in this slot
             unsafe {
-                self._tab.get::<flatbuffers::ForwardsUOffset<flatbuffers::Vector<'a, u8>>>(
-                    UnstakeTx::VT_GAS_SPONSORER,
-                    None,
-                )
+                self._tab
+                    .get::<flatbuffers::ForwardsUOffset<flatbuffers::Vector<'a, u8>>>(
+                        UnstakeTx::VT_GAS_SPONSORER,
+                        None,
+                    )
             }
         }
     }
@@ -1325,7 +1382,8 @@ pub mod tx {
             &mut self,
             witness: flatbuffers::WIPOffset<flatbuffers::Vector<'b, u8>>,
         ) {
-            self.fbb_.push_slot_always::<flatbuffers::WIPOffset<_>>(UnstakeTx::VT_WITNESS, witness);
+            self.fbb_
+                .push_slot_always::<flatbuffers::WIPOffset<_>>(UnstakeTx::VT_WITNESS, witness);
         }
         #[inline]
         pub fn add_amount(&mut self, amount: u64) {
@@ -1358,7 +1416,10 @@ pub mod tx {
             _fbb: &'b mut flatbuffers::FlatBufferBuilder<'a, A>,
         ) -> UnstakeTxBuilder<'a, 'b, A> {
             let start = _fbb.start_table();
-            UnstakeTxBuilder { fbb_: _fbb, start_: start }
+            UnstakeTxBuilder {
+                fbb_: _fbb,
+                start_: start,
+            }
         }
         #[inline]
         pub fn finish(self) -> flatbuffers::WIPOffset<UnstakeTx<'a>> {
@@ -1390,7 +1451,9 @@ pub mod tx {
         type Inner = SolveTx<'a>;
         #[inline]
         unsafe fn follow(buf: &'a [u8], loc: usize) -> Self::Inner {
-            Self { _tab: flatbuffers::Table::new(buf, loc) }
+            Self {
+                _tab: flatbuffers::Table::new(buf, loc),
+            }
         }
     }
 
@@ -1442,10 +1505,11 @@ pub mod tx {
             // Created from valid Table for this object
             // which contains a valid value in this slot
             unsafe {
-                self._tab.get::<flatbuffers::ForwardsUOffset<flatbuffers::Vector<'a, u8>>>(
-                    SolveTx::VT_SENDER,
-                    None,
-                )
+                self._tab
+                    .get::<flatbuffers::ForwardsUOffset<flatbuffers::Vector<'a, u8>>>(
+                        SolveTx::VT_SENDER,
+                        None,
+                    )
             }
         }
         #[inline]
@@ -1454,10 +1518,11 @@ pub mod tx {
             // Created from valid Table for this object
             // which contains a valid value in this slot
             unsafe {
-                self._tab.get::<flatbuffers::ForwardsUOffset<flatbuffers::Vector<'a, u8>>>(
-                    SolveTx::VT_PROOF,
-                    None,
-                )
+                self._tab
+                    .get::<flatbuffers::ForwardsUOffset<flatbuffers::Vector<'a, u8>>>(
+                        SolveTx::VT_PROOF,
+                        None,
+                    )
             }
         }
         #[inline]
@@ -1466,10 +1531,11 @@ pub mod tx {
             // Created from valid Table for this object
             // which contains a valid value in this slot
             unsafe {
-                self._tab.get::<flatbuffers::ForwardsUOffset<flatbuffers::Vector<'a, u8>>>(
-                    SolveTx::VT_PUZZLE_ID,
-                    None,
-                )
+                self._tab
+                    .get::<flatbuffers::ForwardsUOffset<flatbuffers::Vector<'a, u8>>>(
+                        SolveTx::VT_PUZZLE_ID,
+                        None,
+                    )
             }
         }
         #[inline]
@@ -1485,10 +1551,11 @@ pub mod tx {
             // Created from valid Table for this object
             // which contains a valid value in this slot
             unsafe {
-                self._tab.get::<flatbuffers::ForwardsUOffset<flatbuffers::Vector<'a, u8>>>(
-                    SolveTx::VT_SIGNATURE,
-                    None,
-                )
+                self._tab
+                    .get::<flatbuffers::ForwardsUOffset<flatbuffers::Vector<'a, u8>>>(
+                        SolveTx::VT_SIGNATURE,
+                        None,
+                    )
             }
         }
         #[inline]
@@ -1497,10 +1564,11 @@ pub mod tx {
             // Created from valid Table for this object
             // which contains a valid value in this slot
             unsafe {
-                self._tab.get::<flatbuffers::ForwardsUOffset<flatbuffers::Vector<'a, u8>>>(
-                    SolveTx::VT_GAS_SPONSORER,
-                    None,
-                )
+                self._tab
+                    .get::<flatbuffers::ForwardsUOffset<flatbuffers::Vector<'a, u8>>>(
+                        SolveTx::VT_GAS_SPONSORER,
+                        None,
+                    )
             }
         }
     }
@@ -1572,11 +1640,13 @@ pub mod tx {
     impl<'a: 'b, 'b, A: flatbuffers::Allocator + 'a> SolveTxBuilder<'a, 'b, A> {
         #[inline]
         pub fn add_sender(&mut self, sender: flatbuffers::WIPOffset<flatbuffers::Vector<'b, u8>>) {
-            self.fbb_.push_slot_always::<flatbuffers::WIPOffset<_>>(SolveTx::VT_SENDER, sender);
+            self.fbb_
+                .push_slot_always::<flatbuffers::WIPOffset<_>>(SolveTx::VT_SENDER, sender);
         }
         #[inline]
         pub fn add_proof(&mut self, proof: flatbuffers::WIPOffset<flatbuffers::Vector<'b, u8>>) {
-            self.fbb_.push_slot_always::<flatbuffers::WIPOffset<_>>(SolveTx::VT_PROOF, proof);
+            self.fbb_
+                .push_slot_always::<flatbuffers::WIPOffset<_>>(SolveTx::VT_PROOF, proof);
         }
         #[inline]
         pub fn add_puzzle_id(
@@ -1613,7 +1683,10 @@ pub mod tx {
             _fbb: &'b mut flatbuffers::FlatBufferBuilder<'a, A>,
         ) -> SolveTxBuilder<'a, 'b, A> {
             let start = _fbb.start_table();
-            SolveTxBuilder { fbb_: _fbb, start_: start }
+            SolveTxBuilder {
+                fbb_: _fbb,
+                start_: start,
+            }
         }
         #[inline]
         pub fn finish(self) -> flatbuffers::WIPOffset<SolveTx<'a>> {
@@ -1645,7 +1718,9 @@ pub mod tx {
         type Inner = Transaction<'a>;
         #[inline]
         unsafe fn follow(buf: &'a [u8], loc: usize) -> Self::Inner {
-            Self { _tab: flatbuffers::Table::new(buf, loc) }
+            Self {
+                _tab: flatbuffers::Table::new(buf, loc),
+            }
         }
     }
 
@@ -1681,7 +1756,9 @@ pub mod tx {
             // Created from valid Table for this object
             // which contains a valid value in this slot
             unsafe {
-                self._tab.get::<TxBody>(Transaction::VT_BODY_TYPE, Some(TxBody::NONE)).unwrap()
+                self._tab
+                    .get::<TxBody>(Transaction::VT_BODY_TYPE, Some(TxBody::NONE))
+                    .unwrap()
             }
         }
         #[inline]
@@ -1690,10 +1767,11 @@ pub mod tx {
             // Created from valid Table for this object
             // which contains a valid value in this slot
             unsafe {
-                self._tab.get::<flatbuffers::ForwardsUOffset<flatbuffers::Table<'a>>>(
-                    Transaction::VT_BODY,
-                    None,
-                )
+                self._tab
+                    .get::<flatbuffers::ForwardsUOffset<flatbuffers::Table<'a>>>(
+                        Transaction::VT_BODY,
+                        None,
+                    )
             }
         }
         #[inline]
@@ -1846,7 +1924,10 @@ pub mod tx {
     impl<'a> Default for TransactionArgs {
         #[inline]
         fn default() -> Self {
-            TransactionArgs { body_type: TxBody::NONE, body: None }
+            TransactionArgs {
+                body_type: TxBody::NONE,
+                body: None,
+            }
         }
     }
 
@@ -1857,18 +1938,23 @@ pub mod tx {
     impl<'a: 'b, 'b, A: flatbuffers::Allocator + 'a> TransactionBuilder<'a, 'b, A> {
         #[inline]
         pub fn add_body_type(&mut self, body_type: TxBody) {
-            self.fbb_.push_slot::<TxBody>(Transaction::VT_BODY_TYPE, body_type, TxBody::NONE);
+            self.fbb_
+                .push_slot::<TxBody>(Transaction::VT_BODY_TYPE, body_type, TxBody::NONE);
         }
         #[inline]
         pub fn add_body(&mut self, body: flatbuffers::WIPOffset<flatbuffers::UnionWIPOffset>) {
-            self.fbb_.push_slot_always::<flatbuffers::WIPOffset<_>>(Transaction::VT_BODY, body);
+            self.fbb_
+                .push_slot_always::<flatbuffers::WIPOffset<_>>(Transaction::VT_BODY, body);
         }
         #[inline]
         pub fn new(
             _fbb: &'b mut flatbuffers::FlatBufferBuilder<'a, A>,
         ) -> TransactionBuilder<'a, 'b, A> {
             let start = _fbb.start_table();
-            TransactionBuilder { fbb_: _fbb, start_: start }
+            TransactionBuilder {
+                fbb_: _fbb,
+                start_: start,
+            }
         }
         #[inline]
         pub fn finish(self) -> flatbuffers::WIPOffset<Transaction<'a>> {
@@ -1961,7 +2047,9 @@ pub mod tx {
         type Inner = SealedTx<'a>;
         #[inline]
         unsafe fn follow(buf: &'a [u8], loc: usize) -> Self::Inner {
-            Self { _tab: flatbuffers::Table::new(buf, loc) }
+            Self {
+                _tab: flatbuffers::Table::new(buf, loc),
+            }
         }
     }
 
@@ -2003,10 +2091,11 @@ pub mod tx {
             // Created from valid Table for this object
             // which contains a valid value in this slot
             unsafe {
-                self._tab.get::<flatbuffers::ForwardsUOffset<flatbuffers::Vector<'a, u8>>>(
-                    SealedTx::VT_NONCE,
-                    None,
-                )
+                self._tab
+                    .get::<flatbuffers::ForwardsUOffset<flatbuffers::Vector<'a, u8>>>(
+                        SealedTx::VT_NONCE,
+                        None,
+                    )
             }
         }
         #[inline]
@@ -2015,10 +2104,11 @@ pub mod tx {
             // Created from valid Table for this object
             // which contains a valid value in this slot
             unsafe {
-                self._tab.get::<flatbuffers::ForwardsUOffset<flatbuffers::Vector<'a, u8>>>(
-                    SealedTx::VT_TAG,
-                    None,
-                )
+                self._tab
+                    .get::<flatbuffers::ForwardsUOffset<flatbuffers::Vector<'a, u8>>>(
+                        SealedTx::VT_TAG,
+                        None,
+                    )
             }
         }
         #[inline]
@@ -2027,10 +2117,11 @@ pub mod tx {
             // Created from valid Table for this object
             // which contains a valid value in this slot
             unsafe {
-                self._tab.get::<flatbuffers::ForwardsUOffset<flatbuffers::Vector<'a, u8>>>(
-                    SealedTx::VT_CIPHERTEXT,
-                    None,
-                )
+                self._tab
+                    .get::<flatbuffers::ForwardsUOffset<flatbuffers::Vector<'a, u8>>>(
+                        SealedTx::VT_CIPHERTEXT,
+                        None,
+                    )
             }
         }
     }
@@ -2070,7 +2161,11 @@ pub mod tx {
     impl<'a> Default for SealedTxArgs<'a> {
         #[inline]
         fn default() -> Self {
-            SealedTxArgs { nonce: None, tag: None, ciphertext: None }
+            SealedTxArgs {
+                nonce: None,
+                tag: None,
+                ciphertext: None,
+            }
         }
     }
 
@@ -2081,11 +2176,13 @@ pub mod tx {
     impl<'a: 'b, 'b, A: flatbuffers::Allocator + 'a> SealedTxBuilder<'a, 'b, A> {
         #[inline]
         pub fn add_nonce(&mut self, nonce: flatbuffers::WIPOffset<flatbuffers::Vector<'b, u8>>) {
-            self.fbb_.push_slot_always::<flatbuffers::WIPOffset<_>>(SealedTx::VT_NONCE, nonce);
+            self.fbb_
+                .push_slot_always::<flatbuffers::WIPOffset<_>>(SealedTx::VT_NONCE, nonce);
         }
         #[inline]
         pub fn add_tag(&mut self, tag: flatbuffers::WIPOffset<flatbuffers::Vector<'b, u8>>) {
-            self.fbb_.push_slot_always::<flatbuffers::WIPOffset<_>>(SealedTx::VT_TAG, tag);
+            self.fbb_
+                .push_slot_always::<flatbuffers::WIPOffset<_>>(SealedTx::VT_TAG, tag);
         }
         #[inline]
         pub fn add_ciphertext(
@@ -2100,7 +2197,10 @@ pub mod tx {
             _fbb: &'b mut flatbuffers::FlatBufferBuilder<'a, A>,
         ) -> SealedTxBuilder<'a, 'b, A> {
             let start = _fbb.start_table();
-            SealedTxBuilder { fbb_: _fbb, start_: start }
+            SealedTxBuilder {
+                fbb_: _fbb,
+                start_: start,
+            }
         }
         #[inline]
         pub fn finish(self) -> flatbuffers::WIPOffset<SealedTx<'a>> {

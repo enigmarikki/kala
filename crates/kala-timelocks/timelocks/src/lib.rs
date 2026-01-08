@@ -87,7 +87,7 @@ impl Solver {
     }
 
     /// Create a solver using the default GPU (device 0)
-    pub fn default() -> Result<Self, Error> {
+    pub fn try_default() -> Result<Self, Error> {
         Self::new(0)
     }
 
@@ -122,8 +122,13 @@ impl Solver {
             CString::new(c).map_err(|_| Error::InvalidHex("c contains null".to_string()))?;
 
         unsafe {
-            let result =
-                rsw_solver_solve(self.inner, n_cstr.as_ptr(), a_cstr.as_ptr(), c_cstr.as_ptr(), t);
+            let result = rsw_solver_solve(
+                self.inner,
+                n_cstr.as_ptr(),
+                a_cstr.as_ptr(),
+                c_cstr.as_ptr(),
+                t,
+            );
 
             if result.success {
                 Ok(SolveResult { key: result.key })
@@ -131,7 +136,9 @@ impl Solver {
                 let error_msg = if result.error_msg.is_null() {
                     "Unknown error".to_string()
                 } else {
-                    let msg = CStr::from_ptr(result.error_msg).to_string_lossy().to_string();
+                    let msg = CStr::from_ptr(result.error_msg)
+                        .to_string_lossy()
+                        .to_string();
                     rsw_result_free_error(result.error_msg);
                     msg
                 };
@@ -212,12 +219,16 @@ impl Solver {
 
                 for (i, rsw_result) in result_slice.iter().enumerate() {
                     if rsw_result.success {
-                        results.push(SolveResult { key: rsw_result.key });
+                        results.push(SolveResult {
+                            key: rsw_result.key,
+                        });
                     } else {
                         let error_msg = if rsw_result.error_msg.is_null() {
                             "Unknown error".to_string()
                         } else {
-                            CStr::from_ptr(rsw_result.error_msg).to_string_lossy().to_string()
+                            CStr::from_ptr(rsw_result.error_msg)
+                                .to_string_lossy()
+                                .to_string()
                         };
 
                         // Free the batch result before returning error
@@ -290,21 +301,29 @@ mod tests {
 
     #[test]
     fn test_invalid_hex() {
-        let solver = match Solver::default() {
+        let solver = match Solver::try_default() {
             Ok(s) => s,
             Err(_) => return, // Skip test if no GPU
         };
 
-        assert!(matches!(solver.solve("xyz", "2", "abcd", 100), Err(Error::InvalidHex(_))));
+        assert!(matches!(
+            solver.solve("xyz", "2", "abcd", 100),
+            Err(Error::InvalidHex(_))
+        ));
     }
 
     #[test]
     fn test_batch_solve() {
-        let solver = match Solver::default() {
+        let solver = match Solver::try_default() {
             Ok(s) => s,
             Err(_) => return, // Skip test if no GPU
         };
-        let puzzle = ("abcd1234".to_string(), "2".to_string(), "5678".to_string(), 65536);
+        let puzzle = (
+            "abcd1234".to_string(),
+            "2".to_string(),
+            "5678".to_string(),
+            65536,
+        );
         // Create a small batch of test puzzles
         let puzzles = vec![puzzle.clone(); 1000];
         match solver.solve_batch(&puzzles) {

@@ -54,9 +54,17 @@ pub enum TickPhase {
 /// Tick status
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum TickStatus {
-    FullTick { transactions: Vec<Transaction>, state_root: Hash },
-    PartialTick { transactions: Vec<Transaction>, witness_count: usize },
-    WitnessTick { vdf_proofs: Vec<Vec<u8>> },
+    FullTick {
+        transactions: Vec<Transaction>,
+        state_root: Hash,
+    },
+    PartialTick {
+        transactions: Vec<Transaction>,
+        witness_count: usize,
+    },
+    WitnessTick {
+        vdf_proofs: Vec<Vec<u8>>,
+    },
 }
 
 /// Complete tick state
@@ -120,7 +128,13 @@ pub fn test_witness_ids() -> Vec<NodeId> {
 pub fn create_test_account(address: Bytes32, balance: u64) -> Account {
     let mut balances = BTreeMap::new();
     balances.insert([0u8; 32], balance); // Native token
-    Account { address, balances, stake: BTreeMap::new(), nonce: 0, puzzles_solved: Vec::new() }
+    Account {
+        address,
+        balances,
+        stake: BTreeMap::new(),
+        nonce: 0,
+        puzzles_solved: Vec::new(),
+    }
 }
 impl KalaState {
     pub fn genesis(chain_id: NodeId, witness_ids: Vec<NodeId>) -> Self {
@@ -183,7 +197,7 @@ impl KalaState {
             .map(|account| {
                 // Use bincode instead of serde_json for byte array serialization
                 let bytes = bincode::serialize(account)
-                    .map_err(|e| KalaError::serialization(format!("Failed to serialize: {}", e)))?;
+                    .map_err(|e| KalaError::serialization(format!("Failed to serialize: {e}")))?;
                 Ok(CryptoUtils::hash(&bytes))
             })
             .collect::<KalaResult<Vec<_>>>()?;
@@ -223,20 +237,27 @@ impl KalaState {
         }
 
         // Update sender
-        sender_account.balances.insert(send.denom, sender_balance - send.amount);
+        sender_account
+            .balances
+            .insert(send.denom, sender_balance - send.amount);
         sender_account.nonce += 1;
 
         // Update receiver
-        let receiver_account = self.accounts.entry(send.receiver).or_insert_with(|| Account {
-            address: send.receiver,
-            balances: BTreeMap::new(),
-            stake: BTreeMap::new(),
-            nonce: 0,
-            puzzles_solved: Vec::new(),
-        });
+        let receiver_account = self
+            .accounts
+            .entry(send.receiver)
+            .or_insert_with(|| Account {
+                address: send.receiver,
+                balances: BTreeMap::new(),
+                stake: BTreeMap::new(),
+                nonce: 0,
+                puzzles_solved: Vec::new(),
+            });
 
         let receiver_balance = *receiver_account.balances.get(&send.denom).unwrap_or(&0);
-        receiver_account.balances.insert(send.denom, receiver_balance + send.amount);
+        receiver_account
+            .balances
+            .insert(send.denom, receiver_balance + send.amount);
 
         Ok(())
     }
@@ -311,9 +332,13 @@ impl KalaState {
         }
 
         // Move from balance to stake
-        account.balances.insert(native_denom, balance - stake.amount);
+        account
+            .balances
+            .insert(native_denom, balance - stake.amount);
         let current_stake = *account.stake.get(&stake.witness).unwrap_or(&0);
-        account.stake.insert(stake.witness, current_stake + stake.amount);
+        account
+            .stake
+            .insert(stake.witness, current_stake + stake.amount);
         account.nonce += 1;
 
         Ok(())
@@ -337,12 +362,16 @@ impl KalaState {
         // Move from stake to balance
         let native_denom = [0u8; 32];
         let balance = *account.balances.get(&native_denom).unwrap_or(&0);
-        account.balances.insert(native_denom, balance + unstake.amount);
+        account
+            .balances
+            .insert(native_denom, balance + unstake.amount);
 
         if current_stake == unstake.amount {
             account.stake.remove(&unstake.witness);
         } else {
-            account.stake.insert(unstake.witness, current_stake - unstake.amount);
+            account
+                .stake
+                .insert(unstake.witness, current_stake - unstake.amount);
         }
         account.nonce += 1;
 
@@ -376,13 +405,15 @@ impl KalaState {
     pub fn verify_state(&self) -> KalaResult<()> {
         // Verify balances match supply
         for (denom, total_supply) in &self.total_supply {
-            let sum: u64 =
-                self.accounts.values().map(|acc| *acc.balances.get(denom).unwrap_or(&0)).sum();
+            let sum: u64 = self
+                .accounts
+                .values()
+                .map(|acc| *acc.balances.get(denom).unwrap_or(&0))
+                .sum();
 
             if sum != *total_supply {
                 return Err(KalaError::validation(format!(
-                    "Balance sum {} != supply {}",
-                    sum, total_supply
+                    "Balance sum {sum} != supply {total_supply}"
                 )));
             }
         }
@@ -423,7 +454,7 @@ impl KalaState {
     }
 
     pub fn add_observation(&mut self, hash: Hash, observation: WitnessObservation) {
-        self.observations.entry(hash).or_insert_with(Vec::new).push(observation);
+        self.observations.entry(hash).or_default().push(observation);
     }
 
     pub fn add_decrypted_transaction(&mut self, hash: Hash, tx: Transaction) {
@@ -431,7 +462,8 @@ impl KalaState {
     }
 
     pub fn store_tick(&mut self, tick_state: TickState) {
-        self.tick_history.insert(tick_state.tick_number, tick_state.clone());
+        self.tick_history
+            .insert(tick_state.tick_number, tick_state.clone());
         self.last_finalized_tick = tick_state.tick_number;
     }
 }
@@ -473,12 +505,12 @@ impl StateManager {
     pub async fn export_state(&self) -> KalaResult<Vec<u8>> {
         let storable = StorableState::from_kala_state(&self.current_state);
         bincode::serialize(&storable)
-            .map_err(|e| KalaError::Serialization(format!("Failed to serialize: {}", e)))
+            .map_err(|e| KalaError::Serialization(format!("Failed to serialize: {e}")))
     }
 
     pub async fn import_state(&mut self, data: &[u8]) -> KalaResult<()> {
         let storable: StorableState = bincode::deserialize(data)
-            .map_err(|e| KalaError::Deserialization(format!("Failed to deserialize: {}", e)))?;
+            .map_err(|e| KalaError::Deserialization(format!("Failed to deserialize: {e}")))?;
         self.current_state = storable.to_kala_state();
         self.save_state().await
     }
@@ -562,7 +594,6 @@ mod tests {
     use super::*;
     use kala_transaction::types::{Burn, Mint, Send, Solve, Stake, Unstake};
     use tempfile::tempdir;
-    use tokio;
     // Helper function to create test witness IDs
     fn test_witness_ids() -> Vec<NodeId> {
         vec![[1u8; 32], [2u8; 32], [3u8; 32]]
@@ -572,7 +603,13 @@ mod tests {
     fn create_test_account(address: Bytes32, balance: u64) -> Account {
         let mut balances = BTreeMap::new();
         balances.insert([0u8; 32], balance); // Native token
-        Account { address, balances, stake: BTreeMap::new(), nonce: 0, puzzles_solved: Vec::new() }
+        Account {
+            address,
+            balances,
+            stake: BTreeMap::new(),
+            nonce: 0,
+            puzzles_solved: Vec::new(),
+        }
     }
 
     #[test]
@@ -636,7 +673,9 @@ mod tests {
         let denom = [0u8; 32];
 
         // Setup sender account
-        state.accounts.insert(sender_addr, create_test_account(sender_addr, 1000));
+        state
+            .accounts
+            .insert(sender_addr, create_test_account(sender_addr, 1000));
 
         // Create send transaction
         let send = Send {
@@ -672,7 +711,9 @@ mod tests {
         let denom = [0u8; 32];
 
         // Setup sender with insufficient balance
-        state.accounts.insert(sender_addr, create_test_account(sender_addr, 50));
+        state
+            .accounts
+            .insert(sender_addr, create_test_account(sender_addr, 50));
 
         let send = Send {
             sender: sender_addr,
@@ -696,7 +737,9 @@ mod tests {
         let receiver_addr = [2u8; 32];
         let denom = [0u8; 32];
 
-        state.accounts.insert(sender_addr, create_test_account(sender_addr, 1000));
+        state
+            .accounts
+            .insert(sender_addr, create_test_account(sender_addr, 1000));
 
         let send = Send {
             sender: sender_addr,
@@ -748,7 +791,7 @@ mod tests {
         let denom = [0u8; 32];
 
         // Setup account with tokens
-        let mut account = create_test_account(burner_addr, 1000);
+        let account = create_test_account(burner_addr, 1000);
         state.accounts.insert(burner_addr, account);
         state.total_supply.insert(denom, 1000);
 
@@ -782,7 +825,9 @@ mod tests {
         let native_denom = [0u8; 32];
 
         // Setup delegator with balance
-        state.accounts.insert(delegator_addr, create_test_account(delegator_addr, 1000));
+        state
+            .accounts
+            .insert(delegator_addr, create_test_account(delegator_addr, 1000));
 
         let stake = Stake {
             delegator: delegator_addr,
@@ -860,7 +905,7 @@ mod tests {
 
         let account = state.accounts.get(&delegator_addr).unwrap();
         assert_eq!(*account.balances.get(&native_denom).unwrap(), 1000);
-        assert!(account.stake.get(&witness_addr).is_none()); // Entry removed
+        assert!(!account.stake.contains_key(&witness_addr)); // Entry removed
         assert_eq!(account.nonce, 1);
     }
 
@@ -872,7 +917,9 @@ mod tests {
         let puzzle_id = [99u8; 32];
 
         // Setup solver account
-        state.accounts.insert(solver_addr, create_test_account(solver_addr, 0));
+        state
+            .accounts
+            .insert(solver_addr, create_test_account(solver_addr, 0));
 
         let solve = Solve {
             sender: solver_addr,
@@ -921,9 +968,15 @@ mod tests {
         let mut state = KalaState::genesis([0u8; 32], test_witness_ids());
 
         // Add some accounts
-        state.accounts.insert([1u8; 32], create_test_account([1u8; 32], 1000));
-        state.accounts.insert([2u8; 32], create_test_account([2u8; 32], 2000));
-        state.accounts.insert([3u8; 32], create_test_account([3u8; 32], 3000));
+        state
+            .accounts
+            .insert([1u8; 32], create_test_account([1u8; 32], 1000));
+        state
+            .accounts
+            .insert([2u8; 32], create_test_account([2u8; 32], 2000));
+        state
+            .accounts
+            .insert([3u8; 32], create_test_account([3u8; 32], 3000));
 
         let root1 = state.compute_state_root().unwrap();
 
@@ -944,8 +997,12 @@ mod tests {
         let denom = [0u8; 32];
 
         // Setup consistent state
-        state.accounts.insert([1u8; 32], create_test_account([1u8; 32], 500));
-        state.accounts.insert([2u8; 32], create_test_account([2u8; 32], 300));
+        state
+            .accounts
+            .insert([1u8; 32], create_test_account([1u8; 32], 500));
+        state
+            .accounts
+            .insert([2u8; 32], create_test_account([2u8; 32], 300));
         state.total_supply.insert(denom, 800);
 
         let result = state.verify_state();
@@ -959,8 +1016,12 @@ mod tests {
         let denom = [0u8; 32];
 
         // Setup inconsistent state
-        state.accounts.insert([1u8; 32], create_test_account([1u8; 32], 500));
-        state.accounts.insert([2u8; 32], create_test_account([2u8; 32], 300));
+        state
+            .accounts
+            .insert([1u8; 32], create_test_account([1u8; 32], 500));
+        state
+            .accounts
+            .insert([2u8; 32], create_test_account([2u8; 32], 300));
         state.total_supply.insert(denom, 900); // Wrong total
 
         let result = state.verify_state();
@@ -1012,7 +1073,10 @@ mod tests {
             // Modify state
             manager.current_state.current_tick = 10;
             manager.current_state.current_iteration = manager.current_state.k_iterations * 10;
-            manager.current_state.accounts.insert([1u8; 32], create_test_account([1u8; 32], 5000));
+            manager
+                .current_state
+                .accounts
+                .insert([1u8; 32], create_test_account([1u8; 32], 5000));
             manager.current_state.total_supply.insert([0u8; 32], 5000);
 
             // Save state
@@ -1021,8 +1085,9 @@ mod tests {
 
         // Load state in new manager
         {
-            let manager =
-                StateManager::new(db_path.to_str().unwrap(), chain_id, witness_ids).await.unwrap();
+            let manager = StateManager::new(db_path.to_str().unwrap(), chain_id, witness_ids)
+                .await
+                .unwrap();
 
             assert_eq!(manager.current_state.current_tick, 10);
             assert_eq!(
@@ -1030,7 +1095,10 @@ mod tests {
                 manager.current_state.k_iterations * 10
             );
             assert_eq!(manager.current_state.accounts.len(), 1);
-            assert_eq!(*manager.current_state.total_supply.get(&[0u8; 32]).unwrap(), 5000);
+            assert_eq!(
+                *manager.current_state.total_supply.get(&[0u8; 32]).unwrap(),
+                5000
+            );
 
             let account = manager.current_state.accounts.get(&[1u8; 32]).unwrap();
             assert_eq!(*account.balances.get(&[0u8; 32]).unwrap(), 5000);
@@ -1060,8 +1128,9 @@ mod tests {
         } // Manager drops here, releasing the database
 
         // Load and verify latest state in a new manager
-        let new_manager =
-            StateManager::new(db_path.to_str().unwrap(), chain_id, witness_ids).await.unwrap();
+        let new_manager = StateManager::new(db_path.to_str().unwrap(), chain_id, witness_ids)
+            .await
+            .unwrap();
 
         assert_eq!(new_manager.current_state.current_tick, 10);
     }
@@ -1074,7 +1143,9 @@ mod tests {
         state.current_tick = 100;
         state.current_iteration = state.k_iterations * 100;
         state.current_phase = TickPhase::Consensus;
-        state.accounts.insert([1u8; 32], create_test_account([1u8; 32], 1000));
+        state
+            .accounts
+            .insert([1u8; 32], create_test_account([1u8; 32], 1000));
         state.total_supply.insert([0u8; 32], 1000);
 
         // Convert to storable
@@ -1105,8 +1176,12 @@ mod tests {
         let mut state = KalaState::genesis([0u8; 32], test_witness_ids());
 
         // Setup accounts
-        state.accounts.insert([1u8; 32], create_test_account([1u8; 32], 1000));
-        state.accounts.insert([2u8; 32], create_test_account([2u8; 32], 0));
+        state
+            .accounts
+            .insert([1u8; 32], create_test_account([1u8; 32], 1000));
+        state
+            .accounts
+            .insert([2u8; 32], create_test_account([2u8; 32], 0));
 
         // Apply multiple transactions
         let send = Send {

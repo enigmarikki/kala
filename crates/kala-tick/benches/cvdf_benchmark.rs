@@ -1,8 +1,8 @@
-use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
+use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
 use kala_tick::{
-    streamer::PietrzakProof, CVDFConfig, CVDFStepProof, CVDFStreamer, ClassGroup, Discriminant,
-    QuadraticForm,
+    streamer::PietrzakProof, CVDFConfig, CVDFStreamer, ClassGroup, Discriminant, QuadraticForm,
 };
+use std::hint::black_box;
 
 /// Helper to create a test configuration with specified discriminant size
 fn create_test_config(discriminant_bits: u32) -> CVDFConfig {
@@ -97,7 +97,9 @@ fn bench_proof_aggregation(c: &mut Criterion) {
 
                 for _ in 0..chain_length {
                     let next = class_group.square(&current).unwrap();
-                    let proof = streamer.generate_single_step_proof(&current, &next).unwrap();
+                    let proof = streamer
+                        .generate_single_step_proof(&current, &next)
+                        .unwrap();
                     proof_chain.push(proof);
                     current = next;
                 }
@@ -130,9 +132,13 @@ fn bench_class_group_operations(c: &mut Criterion) {
 
     // Benchmark repeated squaring with different exponents
     for exp in [8, 16, 32].iter() {
-        group.bench_with_input(BenchmarkId::new("repeated_squaring", exp), exp, |b, &exp| {
-            b.iter(|| class_group.repeated_squaring(black_box(&form), black_box(exp)));
-        });
+        group.bench_with_input(
+            BenchmarkId::new("repeated_squaring", exp),
+            exp,
+            |b, &exp| {
+                b.iter(|| class_group.repeated_squaring(black_box(&form), black_box(exp)));
+            },
+        );
     }
 
     group.finish();

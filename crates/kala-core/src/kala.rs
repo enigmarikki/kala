@@ -1,6 +1,6 @@
 use kala_common::prelude::KalaResult;
 use kala_common::types::NodeId;
-use kala_state::{KalaState, StateManager, TickPhase};
+use kala_state::{StateManager, TickPhase};
 use kala_tick::{CVDFConfig, CVDFStreamer};
 use std::collections::BTreeMap;
 
@@ -24,11 +24,14 @@ impl KalaApp {
         let state_manager = StateManager::new(db_path, chain_id, witness_ids).await?;
         let cvdf_streamer = CVDFStreamer::new(CVDFConfig::default());
 
-        Ok(KalaApp { state_manager, cvdf_streamer })
+        Ok(KalaApp {
+            state_manager,
+            cvdf_streamer,
+        })
     }
 
     pub async fn start_tick(&mut self) -> KalaResult<()> {
-        let mut state = self.state_manager.get_state_mut();
+        let state = self.state_manager.get_state_mut();
         state.cvdf_proof_cache = BTreeMap::new();
 
         for _i in 1..=state.k_iterations {
@@ -53,7 +56,9 @@ impl KalaApp {
             state.total_iterations += 1;
             //update the form
             state.cvdf_current_form = result.output;
-            state.cvdf_proof_cache.insert(state.current_iteration, result.proof.proof_data);
+            state
+                .cvdf_proof_cache
+                .insert(state.current_iteration, result.proof.proof_data);
         }
         state.current_phase = TickPhase::Finalization;
 

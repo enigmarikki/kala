@@ -8,7 +8,9 @@ use sha2::{Digest, Sha256};
 
 /// Cryptographic constants
 pub const HASH_SIZE: usize = 32;
+/// Public key size in bytes (Ed25519)
 pub const PUBKEY_SIZE: usize = 32;
+/// Signature size in bytes (Ed25519)
 pub const SIGNATURE_SIZE: usize = 64;
 
 /// Central cryptographic utilities
@@ -100,7 +102,7 @@ impl CryptoUtils {
         }
 
         let bytes = hex::decode(hex_str)
-            .map_err(|e| crate::error::KalaError::validation(format!("Invalid hex: {}", e)))?;
+            .map_err(|e| crate::error::KalaError::validation(format!("Invalid hex: {e}")))?;
 
         let mut hash = [0u8; HASH_SIZE];
         hash.copy_from_slice(&bytes);
@@ -123,7 +125,10 @@ impl MerkleTree {
     /// Build merkle tree from leaf hashes
     pub fn new(leaves: Vec<Hash>) -> Self {
         if leaves.is_empty() {
-            return Self { leaves: vec![HashExt::zero()], nodes: vec![HashExt::zero()] };
+            return Self {
+                leaves: vec![HashExt::zero()],
+                nodes: vec![HashExt::zero()],
+            };
         }
 
         let mut nodes = leaves.clone();
@@ -169,8 +174,11 @@ impl MerkleTree {
         let mut level_start = 0;
 
         while level_size > 1 {
-            let sibling_index =
-                if current_index % 2 == 0 { current_index + 1 } else { current_index - 1 };
+            let sibling_index = if current_index % 2 == 0 {
+                current_index + 1
+            } else {
+                current_index - 1
+            };
 
             if sibling_index < level_size {
                 proof.push(self.nodes[level_start + sibling_index]);
@@ -178,7 +186,7 @@ impl MerkleTree {
 
             level_start += level_size;
             current_index /= 2;
-            level_size = (level_size + 1) / 2;
+            level_size = level_size.div_ceil(2);
         }
 
         Some(proof)

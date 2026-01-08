@@ -63,34 +63,49 @@ pub mod network {
 }
 
 /// VDF and consensus constants
-pub mod NetworkParams {
+pub mod network_params {
+    /// Number of VDF iterations per tick
     pub const K_ITERATIONS: u64 = 163840;
+    /// Default class group discriminant for VDF
     pub const DEFAULT_DISCRIMINANT: &str = "-141140317794792668862943332656856519378482291428727287413318722089216448567155737094768903643716404517549715385664163360316296284155310058980984373770517398492951860161717960368874227473669336541818575166839209228684755811071416376384551902149780184532086881683576071479646499601330824259260645952517205526679";
+    /// Iteration number when collection phase ends
     pub const COLLECTION_PHASE_END: u64 = 43690;
+    /// Iteration number when consensus phase ends
     pub const CONSENSUS_PHASE_END: u64 = 65536;
+    /// RSW timelock hardness constant
     pub const RSW_HARDNESS_CONSTANT: u64 = 65536;
+    /// Byzantine fault tolerance threshold denominator (1/3)
     pub const BYZANTINE_THRESHOLD_DENOMINATOR: usize = 3;
 }
 
 /// Configuration defaults
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct KalaDefaults {
+    /// Number of VDF iterations per tick
     pub iterations_per_tick: u64,
+    /// Maximum number of peer connections
     pub max_peers: usize,
+    /// RPC server port
     pub rpc_port: u16,
+    /// P2P network port
     pub network_port: u16,
 }
 
 /// Version information
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct VersionInfo {
+    /// Semantic version string
     pub version: String,
+    /// Protocol version number
     pub protocol_version: u32,
+    /// Build timestamp
     pub build_time: String,
+    /// Git commit hash if available
     pub git_commit: Option<String>,
 }
 
 impl VersionInfo {
+    /// Get current version information
     pub fn current() -> Self {
         Self {
             version: env!("CARGO_PKG_VERSION").to_string(),
@@ -103,7 +118,8 @@ impl VersionInfo {
 
 /// Utility functions for common operations using extension traits
 macro_rules! impl_byte_array_ext {
-    ($name:ident, $len:expr) => {
+    ($name:ident, $len:expr, $doc:expr) => {
+        #[doc = $doc]
         pub trait $name {
             /// Create an array filled with zeros
             fn zero() -> Self;
@@ -123,6 +139,14 @@ macro_rules! impl_byte_array_ext {
     };
 }
 
-impl_byte_array_ext!(HashExt, 32);
-impl_byte_array_ext!(PublicKeyExt, 32);
-impl_byte_array_ext!(SignatureExt, 64);
+impl_byte_array_ext!(HashExt, 32, "Extension trait for 32-byte hash arrays");
+impl_byte_array_ext!(
+    PublicKeyExt,
+    32,
+    "Extension trait for 32-byte public key arrays"
+);
+impl_byte_array_ext!(
+    SignatureExt,
+    64,
+    "Extension trait for 64-byte signature arrays"
+);
